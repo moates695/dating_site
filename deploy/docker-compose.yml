@@ -1,7 +1,7 @@
 # Deployment for the dating site on the droplet.
 #
 # The container joins the shared reverse-proxy network so nginx-proxy-prod can
-# route dates.moates.com.au to dates-prod:8000 by name. It publishes no host
+# route date.moates.com.au to dates-prod:8000 by name. It publishes no host
 # port; nginx reaches it over the docker network.
 #
 # Do not run this by hand on the droplet. Deploy from a clone of this repo with:

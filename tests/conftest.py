@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import Settings  # noqa: E402
-from app.db import LivePage, ResponseStats  # noqa: E402
+from app.db import LivePage, RecordedView, ResponseStats, StoredResponse  # noqa: E402
 
 TEST_TOKEN = "abcdefgh2345"
 
@@ -27,6 +27,11 @@ class FakeDatabase:
         self.pages = pages or {}
         self.responses: list[dict] = []
         self.notified: list[int] = []
+        self.views: list[dict] = []
+        self.notified_views: list[int] = []
+        # Set by a test that needs to prove a broken database cannot break a
+        # page load.
+        self.record_view_fails = False
 
     async def get_live_page(self, token: str) -> LivePage | None:
         return self.pages.get(token)
@@ -36,8 +41,9 @@ class FakeDatabase:
         latest = max((r["created_at"] for r in rows), default=None)
         return ResponseStats(count=len(rows), latest_at=latest)
 
-    async def insert_response(self, page_id: int, summary: str, answers: dict):
+    async def insert_response(self, page_id: int, summary: str, answers: dict) -> StoredResponse:
         created_at = datetime.now(UTC)
+        is_first = not any(r["page_id"] == page_id for r in self.responses)
         row = {
             "id": len(self.responses) + 1,
             "page_id": page_id,
@@ -46,10 +52,40 @@ class FakeDatabase:
             "created_at": created_at,
         }
         self.responses.append(row)
-        return row["id"], created_at
+        return StoredResponse(response_id=row["id"], created_at=created_at, is_first=is_first)
 
     async def mark_notified(self, response_id: int) -> None:
         self.notified.append(response_id)
+
+    async def record_view(
+        self,
+        page_id: int,
+        kind: str,
+        *,
+        is_self: bool,
+        ip_hash: str | None,
+        user_agent: str | None,
+    ) -> RecordedView:
+        if self.record_view_fails:
+            raise RuntimeError("database is down")
+
+        is_first = not any(
+            v["page_id"] == page_id and v["kind"] == "load" and not v["is_self"]
+            for v in self.views
+        )
+        row = {
+            "id": len(self.views) + 1,
+            "page_id": page_id,
+            "kind": kind,
+            "is_self": is_self,
+            "ip_hash": ip_hash,
+            "user_agent": user_agent,
+        }
+        self.views.append(row)
+        return RecordedView(view_id=row["id"], is_first=is_first)
+
+    async def mark_view_notified(self, view_id: int) -> None:
+        self.notified_views.append(view_id)
 
     async def close(self) -> None:
         return None

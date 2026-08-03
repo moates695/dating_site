@@ -10,7 +10,7 @@ and in `pages/<token>/`, which is gitignored.
 ## How it fits together
 
 ```
-dates.moates.com.au/d/<token>/
+date.moates.com.au/d/<token>/
         │
         ▼
   nginx-proxy-prod ──► dates-prod (FastAPI) ──► Postgres 16 (host)
@@ -37,6 +37,38 @@ animations and interactions per person are all just different files.
 Postgres is the source of truth. A response is committed before Telegram is
 called, so a failed notification leaves `responses.notified_at` null but never
 loses the reply. `scripts/list_people.py --responses <token>` shows those.
+
+## Knowing whether a page was opened
+
+Opens are recorded in `page_views`, and the first real one pings Telegram. The
+point is to tell *the link never arrived* apart from *she has seen it and is
+thinking*, so it deliberately stays at opened / not opened.
+
+Two things make that signal honest:
+
+**Only JavaScript counts as an open.** Messaging apps fetch the page HTML to
+build a link preview the moment you send the URL, which would otherwise fire a
+notification triggered by your own message. Those fetches are recorded as
+`kind = 'fetch'` and never notified. The context call the page makes once it is
+running in a browser is `kind = 'load'`, and that is the one that counts.
+
+**Your own visits carry `?mode=test`.** Open
+`…/d/<token>/?mode=test` and the visit is stored with `is_self` set and stays
+silent. The page passes the query string through to its context call, so the
+marker covers both requests. Nothing is stored in the browser, which is the
+point: forget the marker and you get a notification you can recognise as
+yourself, rather than a browser silently marked as yours forever. If you ever
+send someone a URL with the marker still attached, that visit is silent, so
+check the link before sending it.
+
+```bash
+uv run scripts/list_people.py                 # opened / not opened per person
+uv run scripts/list_people.py --views <token> # every view, labelled
+```
+
+Only the *first* real open notifies. Coming back later is recorded but silent.
+Addresses are stored as a salted hash, never raw, which is enough to tell two
+visitors apart and to spot a forwarded link.
 
 ## Local setup
 
@@ -118,7 +150,7 @@ One-time setup on the droplet:
 2. Add the server block in `deploy/nginx-dates.conf` to
    `/root/gym_junkie_server/nginx/nginx.conf.template`, then
    `ssh do docker restart nginx-proxy-prod`.
-3. Add a proxied A record for `dates.moates.com.au` in Cloudflare pointing at
+3. Add a proxied A record for `date.moates.com.au` in Cloudflare pointing at
    the droplet. The wildcard `*.moates.com.au` origin certificate already covers
    the subdomain, so there is no certificate work.
 
@@ -144,7 +176,7 @@ of `app.db.Database`.
 
 | Path | |
 | --- | --- |
-| `app/main.py` | routes: serve bundle, context, submit |
+| `app/main.py` | routes: serve bundle, context, submit; view logging |
 | `app/submissions.py` | structural validation of posted JSON |
 | `app/bundles.py` | path resolution, traversal guards |
 | `app/db.py` / `app/admin.py` | request-path queries / CLI queries |

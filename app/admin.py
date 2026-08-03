@@ -12,6 +12,7 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from app.config import ENV_LOCAL
 from app.tokens import generate_token
 
 TOKEN_COLLISION_RETRIES = 5
@@ -100,7 +101,10 @@ def list_people(conn: psycopg.Connection) -> list[dict[str, Any]]:
                live.version                as live_version,
                live.bundle_dir             as live_bundle_dir,
                coalesce(counts.total, 0)   as responses,
-               counts.latest_at
+               counts.latest_at,
+               coalesce(views.opens, 0)    as opens,
+               views.first_open,
+               views.last_open
           from people pe
           left join pages live
                  on live.person_id = pe.id and live.is_live
@@ -110,10 +114,142 @@ def list_people(conn: psycopg.Connection) -> list[dict[str, Any]]:
                    join pages p on p.id = r.page_id
                   where p.person_id = pe.id
                ) counts on true
+          left join lateral (
+                 -- Only real opens: your own visits and link-preview fetches
+                 -- would otherwise read as someone looking at the page.
+                 select count(*)         as opens,
+                        min(v.viewed_at) as first_open,
+                        max(v.viewed_at) as last_open
+                   from page_views v
+                   join pages p on p.id = v.page_id
+                  where p.person_id = pe.id
+                    and v.kind = 'load'
+                    and not v.is_self
+               ) views on true
          order by pe.created_at
         """
     )
     return cursor.fetchall()
+
+
+def list_views(conn: psycopg.Connection, token: str) -> list[dict[str, Any]]:
+    """Every recorded view of one person's pages, newest first.
+
+    Includes your own visits and the HTML fetches that link previews make, both
+    labelled, because the reason to look at this list is usually to work out
+    which of those an unexpected view was.
+    """
+    cursor = conn.execute(
+        """
+        select v.kind, v.is_self, v.ip_hash, v.user_agent, v.viewed_at, v.notified_at, pg.version
+          from page_views v
+          join pages  pg on pg.id = v.page_id
+          join people pe on pe.id = pg.person_id
+         where pe.token = %s
+         order by v.viewed_at desc
+        """,
+        (token,),
+    )
+    return cursor.fetchall()
+
+
+def count_views(conn: psycopg.Connection, token: str | None = None) -> int:
+    """How many recorded views a reset would remove."""
+    if token is None:
+        cursor = conn.execute("select count(*) as total from page_views")
+    else:
+        cursor = conn.execute(
+            """
+            select count(*) as total
+              from page_views v
+              join pages  pg on pg.id = v.page_id
+              join people pe on pe.id = pg.person_id
+             where pe.token = %s
+            """,
+            (token,),
+        )
+    return cursor.fetchone()["total"]
+
+
+def delete_views(conn: psycopg.Connection, token: str | None = None) -> int:
+    """Delete recorded views so the next visit counts as a first open again.
+
+    Without this a reset page would open silently: the notification fires once
+    per page and the row saying it already fired would still be there.
+    """
+    with conn.transaction():
+        if token is None:
+            cursor = conn.execute("delete from page_views")
+        else:
+            cursor = conn.execute(
+                """
+                delete from page_views v
+                 using pages pg, people pe
+                 where v.page_id = pg.id
+                   and pg.person_id = pe.id
+                   and pe.token = %s
+                """,
+                (token,),
+            )
+        return cursor.rowcount
+
+
+def ensure_local(app_env: str) -> None:
+    """Refuse a destructive command anywhere but the local dev database.
+
+    Both databases are reached over localhost (dev on 5433, prod through an SSH
+    tunnel on 25432), so the connection string is not a safe way to tell them
+    apart. APP_ENV is, and it is the one thing .env.prod always sets. A prod
+    response is a real reply from a real person and there is no undo.
+    """
+    if app_env != ENV_LOCAL:
+        raise SystemExit(
+            f"refusing to delete responses with APP_ENV={app_env!r}. "
+            f"This only ever runs against the local dev database."
+        )
+
+
+def count_responses(conn: psycopg.Connection, token: str | None = None) -> int:
+    """How many stored replies a reset would remove."""
+    if token is None:
+        cursor = conn.execute("select count(*) as total from responses")
+    else:
+        cursor = conn.execute(
+            """
+            select count(*) as total
+              from responses r
+              join pages  pg on pg.id = r.page_id
+              join people pe on pe.id = pg.person_id
+             where pe.token = %s
+            """,
+            (token,),
+        )
+    return cursor.fetchone()["total"]
+
+
+def delete_responses(conn: psycopg.Connection, token: str | None = None) -> int:
+    """Delete stored replies so a page opens as if it had never been answered.
+
+    Scoped to one person when a token is given, otherwise every response in the
+    database. People and pages are deliberately left alone: the token, the URL
+    and the bundle directory all stay valid, so the same link can be reopened.
+    Returns the number of rows removed.
+    """
+    with conn.transaction():
+        if token is None:
+            cursor = conn.execute("delete from responses")
+        else:
+            cursor = conn.execute(
+                """
+                delete from responses r
+                 using pages pg, people pe
+                 where r.page_id = pg.id
+                   and pg.person_id = pe.id
+                   and pe.token = %s
+                """,
+                (token,),
+            )
+        return cursor.rowcount
 
 
 def list_responses(conn: psycopg.Connection, token: str) -> list[dict[str, Any]]:

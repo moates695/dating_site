@@ -18,13 +18,13 @@
 # Config (override via env):
 #   DATES_SSH_HOST    ssh host/alias for the droplet  (default: do)
 #   DATES_REMOTE_DIR  build context on the droplet    (default: /opt/dating_site)
-#   DATES_URL         public endpoint to verify       (default: https://dates.moates.com.au/healthz)
+#   DATES_URL         public endpoint to verify       (default: https://date.moates.com.au/healthz)
 
 set -euo pipefail
 
 SSH_HOST="${DATES_SSH_HOST:-do}"
 REMOTE_DIR="${DATES_REMOTE_DIR:-/opt/dating_site}"
-PUBLIC_URL="${DATES_URL:-https://dates.moates.com.au/healthz}"
+PUBLIC_URL="${DATES_URL:-https://date.moates.com.au/healthz}"
 CONTAINER="dates-prod"
 
 ALLOW_DIRTY=0

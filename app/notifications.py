@@ -21,13 +21,19 @@ MAX_MESSAGE_CHARS = 3500
 SEND_TIMEOUT_SECONDS = 10.0
 
 
-def format_notification(display_name: str, summary: str, answers: dict) -> str:
+def format_notification(display_name: str, summary: str, answers: dict, *, is_first: bool) -> str:
     """Build the message body.
+
+    A revised answer gets its own headline so a repeat notification is never
+    mistaken for a fresh reply, but the details below it are the full picture
+    every time: the new answers stand alone, with no diff to piece together.
 
     Sent as plain text with no parse_mode, so nothing needs escaping: a note
     full of underscores or asterisks cannot break or reformat the message.
     """
-    lines = [f"💌 {clean_text(display_name, 100)} replied"]
+    name = clean_text(display_name, 100)
+    headline = f"💌 {name} replied" if is_first else f"🔄 {name} changed their answer"
+    lines = [headline]
 
     if summary:
         lines.append("")
@@ -41,6 +47,17 @@ def format_notification(display_name: str, summary: str, answers: dict) -> str:
     if len(message) > MAX_MESSAGE_CHARS:
         message = message[: MAX_MESSAGE_CHARS - 1] + "…"
     return message
+
+
+def format_view_notification(display_name: str) -> str:
+    """Build the message for a first open.
+
+    Only ever sent once per page, so it says so: the silence afterwards is the
+    design, not a page that stopped working or a notification that went
+    missing.
+    """
+    name = clean_text(display_name, 100)
+    return f"👀 {name} opened the page\n\nFirst open. There is no second view notification."
 
 
 async def send_notification(bot_token: str, chat_id: str, message: str) -> bool:

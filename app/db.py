@@ -30,6 +30,21 @@ class ResponseStats:
     latest_at: datetime | None
 
 
+@dataclass(frozen=True)
+class StoredResponse:
+    response_id: int
+    created_at: datetime
+    is_first: bool
+
+
+@dataclass(frozen=True)
+class RecordedView:
+    view_id: int
+    # True when no notifiable view of this page had been recorded before this
+    # one. Only meaningful for a notifiable view; see record_view.
+    is_first: bool
+
+
 class Database:
     """Thin query layer. Tests substitute a fake with the same methods."""
 
@@ -81,20 +96,76 @@ class Database:
 
     async def insert_response(
         self, page_id: int, summary: str, answers: dict[str, Any]
-    ) -> tuple[int, datetime]:
-        """Store a response and return (id, created_at). Committed on return."""
+    ) -> StoredResponse:
+        """Store a response. Committed on return.
+
+        The prior count is taken in the same statement as the insert, so
+        `is_first` cannot be thrown off by a second submission racing this one:
+        the CTE sees the snapshot from before this row existed.
+        """
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
-                "insert into responses (page_id, summary, answers)"
-                " values (%s, %s, %s) returning id, created_at",
-                (page_id, summary or None, Jsonb(answers)),
+                """
+                with prior as (
+                    select count(*) as earlier from responses where page_id = %s
+                )
+                insert into responses (page_id, summary, answers)
+                     values (%s, %s, %s)
+                  returning id, created_at, (select earlier from prior) = 0 as is_first
+                """,
+                (page_id, page_id, summary or None, Jsonb(answers)),
             )
             row = await cursor.fetchone()
-        return row["id"], row["created_at"]
+        return StoredResponse(
+            response_id=row["id"],
+            created_at=row["created_at"],
+            is_first=row["is_first"],
+        )
 
     async def mark_notified(self, response_id: int) -> None:
         async with self._pool.connection() as conn:
             await conn.execute(
                 "update responses set notified_at = now() where id = %s",
                 (response_id,),
+            )
+
+    async def record_view(
+        self,
+        page_id: int,
+        kind: str,
+        *,
+        is_self: bool,
+        ip_hash: str | None,
+        user_agent: str | None,
+    ) -> RecordedView:
+        """Store one view and report whether it is the first worth telling you about.
+
+        `is_first` counts only notifiable views (a 'load' that is not the
+        owner's), so opening the page yourself, or a messaging app fetching the
+        HTML to build a link preview, never uses up the one notification. The
+        count is taken in the same statement as the insert, the same way
+        insert_response does it, so this row cannot count itself.
+        """
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                with prior as (
+                    select count(*) as earlier
+                      from page_views
+                     where page_id = %s and kind = 'load' and not is_self
+                )
+                insert into page_views (page_id, kind, is_self, ip_hash, user_agent)
+                     values (%s, %s, %s, %s, %s)
+                  returning id, (select earlier from prior) = 0 as is_first
+                """,
+                (page_id, page_id, kind, is_self, ip_hash, user_agent),
+            )
+            row = await cursor.fetchone()
+        return RecordedView(view_id=row["id"], is_first=row["is_first"])
+
+    async def mark_view_notified(self, view_id: int) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "update page_views set notified_at = now() where id = %s",
+                (view_id,),
             )

@@ -1,3 +1,5 @@
+import logging
+
 from conftest import TEST_TOKEN
 
 UNKNOWN_TOKEN = "zzzzzzzz9999"
@@ -111,3 +113,21 @@ def test_notification_is_skipped_when_telegram_is_unconfigured(client, fake_db):
     client.post(f"/api/d/{TEST_TOKEN}/submit", json=PAYLOAD)
     assert len(fake_db.responses) == 1
     assert fake_db.notified == []
+
+
+def test_first_submit_notifies_as_a_new_reply(client, caplog):
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        client.post(f"/api/d/{TEST_TOKEN}/submit", json=PAYLOAD)
+    assert "💌 Test Person One replied" in caplog.text
+
+
+def test_a_later_submit_notifies_as_a_change(client, caplog):
+    """Reopening the form and sending again is a change, not a new reply."""
+    client.post(f"/api/d/{TEST_TOKEN}/submit", json=PAYLOAD)
+
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        caplog.clear()
+        client.post(f"/api/d/{TEST_TOKEN}/submit", json=PAYLOAD)
+
+    assert "🔄 Test Person One changed their answer" in caplog.text
+    assert "replied" not in caplog.text

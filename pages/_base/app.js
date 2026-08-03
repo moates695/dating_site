@@ -183,7 +183,9 @@ function indexRise(view) {
 
 (async function init() {
   try {
-    const response = await fetch(`${API}/context`);
+    // Carry the query string across so ?mode=test still marks this as your own
+    // visit: this call, not the page request, is what counts as an open.
+    const response = await fetch(`${API}/context${location.search}`);
     if (!response.ok) return;
 
     const context = await response.json();

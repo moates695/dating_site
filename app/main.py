@@ -8,9 +8,11 @@ behaves, never requires a change in here.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +28,7 @@ from fastapi.responses import (
 from app.bundles import INDEX_FILENAME, BundleError, resolve_asset
 from app.config import Settings, load_settings
 from app.db import Database, LivePage
-from app.notifications import format_notification, send_notification
+from app.notifications import format_notification, format_view_notification, send_notification
 from app.ratelimit import RateLimiter
 from app.submissions import MAX_PAYLOAD_BYTES, SubmissionError, parse_submission
 from app.tokens import is_valid_token
@@ -35,6 +37,22 @@ LOGGER = logging.getLogger(__name__)
 
 ASSET_CACHE_SECONDS = 300
 NOT_FOUND_HTML = "<!doctype html><meta charset=utf-8><title>Not found</title><p>Not found."
+
+# Your own visits carry ?mode=test. Nothing is stored in the browser, so the
+# marker only applies to the visit that carries it: forget it and you get a
+# notification you can recognise as yourself, which is a far better failure
+# than a browser silently marked as yours forever.
+OWNER_MODE_PARAM = "mode"
+OWNER_MODE_VALUE = "test"
+
+# A request for the page HTML. Link-preview crawlers make this the moment the
+# URL is sent in a message, so it is recorded but never notified.
+VIEW_KIND_FETCH = "fetch"
+# The context call the page makes from JavaScript. Crawlers do not run
+# JavaScript, so this is the one that means a person opened the page.
+VIEW_KIND_LOAD = "load"
+
+MAX_USER_AGENT_CHARS = 300
 
 
 def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
@@ -83,7 +101,9 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
         return RedirectResponse(f"/d/{token}/", status_code=308)
 
     @app.get("/d/{token}/{asset_path:path}")
-    async def serve_bundle(request: Request, token: str, asset_path: str):
+    async def serve_bundle(
+        request: Request, token: str, asset_path: str, background: BackgroundTasks
+    ):
         page = await _lookup(request, token)
         if page is None:
             return HTMLResponse(NOT_FOUND_HTML, status_code=404)
@@ -102,6 +122,18 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
                 LOGGER.error("live page %s has no %s on disk", page.page_id, INDEX_FILENAME)
             return HTMLResponse(NOT_FOUND_HTML, status_code=404)
 
+        if is_index:
+            # Assets are not recorded: one page open should be one row, not one
+            # per stylesheet.
+            background.add_task(
+                _record_view,
+                settings,
+                request.app.state.db,
+                page,
+                VIEW_KIND_FETCH,
+                _visit_facts(request, page),
+            )
+
         if is_index or settings.is_local:
             # The page asks for its own state on load, so a cached copy would
             # show the wrong submitted/not-submitted view.
@@ -111,10 +143,22 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
         return FileResponse(path, headers={"Cache-Control": cache})
 
     @app.get("/api/d/{token}/context")
-    async def page_context(request: Request, token: str):
+    async def page_context(request: Request, token: str, background: BackgroundTasks):
         page = await _lookup(request, token)
         if page is None:
             return JSONResponse({"error": "not_found"}, status_code=404)
+
+        # JavaScript is running, so this is a real browser rather than a link
+        # preview. Recorded after the response so a slow write never delays the
+        # page, and so a failure here cannot stop it rendering.
+        background.add_task(
+            _record_view,
+            request.app.state.settings,
+            request.app.state.db,
+            page,
+            VIEW_KIND_LOAD,
+            _visit_facts(request, page),
+        )
 
         stats = await request.app.state.db.response_stats(page.page_id)
         return JSONResponse(
@@ -148,7 +192,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
 
         # Postgres is the source of truth: commit first, notify afterwards, so a
         # Telegram outage can never cost a submission.
-        response_id, created_at = await request.app.state.db.insert_response(
+        stored = await request.app.state.db.insert_response(
             page.page_id, submission.summary, submission.answers
         )
 
@@ -156,18 +200,119 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
             _notify,
             request.app.state.settings,
             request.app.state.db,
-            response_id,
+            stored.response_id,
             page.display_name,
             submission.summary,
             submission.answers,
+            stored.is_first,
         )
 
         return JSONResponse(
-            {"ok": True, "submitted_at": created_at.isoformat()},
+            {"ok": True, "submitted_at": stored.created_at.isoformat()},
             headers={"Cache-Control": "no-store"},
         )
 
     return app
+
+
+@dataclass(frozen=True)
+class _Visit:
+    """What is worth keeping about one request, extracted before it goes away."""
+
+    is_self: bool
+    ip_hash: str | None
+    user_agent: str | None
+
+
+def _visit_facts(request: Request, page: LivePage) -> _Visit:
+    return _Visit(
+        is_self=request.query_params.get(OWNER_MODE_PARAM) == OWNER_MODE_VALUE,
+        ip_hash=_hash_ip(page.token, _client_ip(request)),
+        user_agent=(request.headers.get("user-agent") or "").strip()[:MAX_USER_AGENT_CHARS] or None,
+    )
+
+
+def _client_ip(request: Request) -> str | None:
+    """The visitor's address, as best it can be known.
+
+    In production the socket peer is a Cloudflare edge address, so the real one
+    only ever arrives in a header. CF-Connecting-IP is written by Cloudflare
+    itself and is trustworthy exactly as long as the origin cannot be reached
+    except through Cloudflare, which is why that DNS record stays proxied.
+    """
+    direct = request.headers.get("cf-connecting-ip")
+    if direct:
+        return direct.strip() or None
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # Left-most entry is the client; everything after it is a proxy hop.
+        return forwarded.split(",")[0].strip() or None
+
+    return request.client.host if request.client else None
+
+
+def _hash_ip(token: str, ip: str | None) -> str | None:
+    """Hash an address rather than store it.
+
+    Repeat visits from one connection still group together, but nothing in the
+    database is a real person's address. Salted with the page token so the
+    hashes cannot be matched up against another page, or against a list of
+    guessed addresses without knowing the token.
+    """
+    if not ip:
+        return None
+    return hashlib.sha256(f"{token}:{ip}".encode()).hexdigest()
+
+
+async def _record_view(
+    settings: Settings,
+    db: Database,
+    page: LivePage,
+    kind: str,
+    visit: _Visit,
+) -> None:
+    """Store a view and, if it is the first real one, send the notification.
+
+    Runs after the response has been sent. Every failure in here is swallowed:
+    knowing a page was opened is never worth breaking the page over.
+    """
+    try:
+        view = await db.record_view(
+            page.page_id,
+            kind,
+            is_self=visit.is_self,
+            ip_hash=visit.ip_hash,
+            user_agent=visit.user_agent,
+        )
+    except Exception:
+        LOGGER.exception("failed to record %s view of page %s", kind, page.page_id)
+        return
+
+    if kind != VIEW_KIND_LOAD or visit.is_self or not view.is_first:
+        return
+
+    message = format_view_notification(page.display_name)
+
+    if not settings.telegram_enabled:
+        LOGGER.info("telegram not configured; message would have been:\n%s", message)
+        return
+
+    try:
+        sent = await send_notification(
+            settings.telegram_bot_token, settings.telegram_chat_id, message
+        )
+    except Exception:
+        LOGGER.exception("view notification raised for page %s", page.page_id)
+        return
+
+    if sent:
+        try:
+            await db.mark_view_notified(view.view_id)
+        except Exception:
+            LOGGER.exception("view %s notified but not marked", view.view_id)
+    else:
+        LOGGER.error("first view of page %s recorded but not notified", page.page_id)
 
 
 async def _lookup(request: Request, token: str) -> LivePage | None:
@@ -200,8 +345,9 @@ async def _notify(
     display_name: str,
     summary: str,
     answers: dict[str, Any],
+    is_first: bool,
 ) -> None:
-    message = format_notification(display_name, summary, answers)
+    message = format_notification(display_name, summary, answers, is_first=is_first)
 
     if not settings.telegram_enabled:
         LOGGER.info("telegram not configured; message would have been:\n%s", message)

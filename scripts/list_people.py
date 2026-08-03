@@ -1,9 +1,10 @@
 #!/usr/bin/env python3.12
-"""List everyone, their URL, and whether they have replied.
+"""List everyone, their URL, whether they opened the page, and whether they replied.
 
     uv run scripts/list_people.py
     uv run scripts/list_people.py --env-file .env.prod
     uv run scripts/list_people.py --responses <token>
+    uv run scripts/list_people.py --views <token>
 """
 
 from __future__ import annotations
@@ -13,12 +14,13 @@ import json
 
 from _common import add_env_argument, settings_from_args
 
-from app.admin import connect, list_people, list_responses
+from app.admin import connect, list_people, list_responses, list_views
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--responses", metavar="TOKEN", help="show full answers for one person")
+    parser.add_argument("--views", metavar="TOKEN", help="show every recorded view for one person")
     add_env_argument(parser)
     args = parser.parse_args()
 
@@ -27,6 +29,9 @@ def main() -> None:
     with connect(settings.database_url) as conn:
         if args.responses:
             _print_responses(conn, args.responses)
+            return
+        if args.views:
+            _print_views(conn, args.views)
             return
         _print_people(conn, settings)
 
@@ -44,9 +49,39 @@ def _print_people(conn, settings) -> None:
             if row["responses"]
             else "no reply yet"
         )
+        opened = (
+            f"opened {row['opens']}×, first {row['first_open']:%Y-%m-%d %H:%M}"
+            if row["opens"]
+            else "not opened yet"
+        )
         print(f"{row['display_name']}")
         print(f"  {settings.page_url(row['token'])}")
-        print(f"  {version} · {replied}")
+        print(f"  {version} · {opened} · {replied}")
+        print()
+
+
+def _print_views(conn, token: str) -> None:
+    rows = list_views(conn, token)
+    if not rows:
+        print("no views")
+        return
+
+    for row in rows:
+        if row["is_self"]:
+            label = "you"
+        elif row["kind"] == "fetch":
+            # A page request with no JavaScript behind it: almost always a
+            # messaging app building a link preview, not a person.
+            label = "page fetch"
+        else:
+            label = "OPENED"
+        notified = " · notified" if row["notified_at"] else ""
+        print(f"[{row['viewed_at']:%Y-%m-%d %H:%M}] v{row['version']} · {label}{notified}")
+        if row["user_agent"]:
+            print(f"  {row['user_agent'][:110]}")
+        if row["ip_hash"]:
+            # Enough to tell two visitors apart without storing an address.
+            print(f"  ip {row['ip_hash'][:12]}")
         print()
 
 
