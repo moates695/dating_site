@@ -1,0 +1,134 @@
+<!doctype html>
+<!--
+  Starter bundle. Copy this directory for each new person (add_person.py does
+  it for you), then change absolutely anything: the server does not parse this
+  file, so different layouts, styles, animations and interactions per person are
+  all fine.
+
+  The only contract with the server is in app.js: POST {summary, answers} to
+  /api/d/<token>/submit. Everything else is yours.
+
+  Structural bits worth keeping:
+    data-question="key"   an answer key in the stored JSON
+    data-mode="single"    one choice   -> answers.key = "value"
+    data-mode="multi"     many choices -> answers.key = ["value", ...]
+    (no data-mode)        an input or textarea -> answers.key = "typed text"
+    data-value / data-label  the stored value and its human-readable summary text
+    data-rise             materialises in on load; app.js numbers them in
+                          document order, so add or reorder freely
+-->
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<!-- Light only, so a dark-mode phone doesn't render controls against a light
+     page. theme-color matches the page so the browser chrome blends in. -->
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#fff8f3">
+<title>An idea or two</title>
+<link rel="stylesheet" href="style.css">
+<script>
+  /* Holds the entrance cascade until app.js knows whether to show the form or
+     the confirmation, otherwise the form materialises and is then replaced.
+     Must be in <head>, before anything paints.
+
+     The timeout is a failsafe: if app.js never loads or throws, this still
+     releases the page rather than leaving it blank. */
+  document.documentElement.classList.add('is-booting');
+  setTimeout(function () {
+    document.documentElement.classList.remove('is-booting');
+  }, 1200);
+</script>
+</head>
+
+<body>
+<main class="page" id="form-view">
+
+  <header class="intro">
+    <p class="kicker" data-rise>Date ideas</p>
+    <h1 data-rise>Hello<span id="greeting-name"></span></h1>
+    <p class="lede" data-rise>
+      I had a few ideas. Pick whichever one you like the look of, or tell me
+      I've got it completely wrong at the bottom.
+    </p>
+  </header>
+
+  <!-- ── Question: which idea ─────────────────────────────────────────── -->
+  <section class="block" data-question="main" data-mode="single" data-required>
+    <h2 data-rise>What sounds good?</h2>
+    <div class="cards">
+
+      <button type="button" class="card" data-rise data-value="rooftop_cocktails"
+              data-label="Rooftop cocktails">
+        <span class="card-emoji">🍸</span>
+        <span class="card-body">
+          <span class="card-title">Rooftop cocktails</span>
+          <span class="card-blurb">Somewhere with a view and a decent negroni.</span>
+        </span>
+        <span class="card-tags"><span class="tag">evening</span><span class="tag">city</span></span>
+      </button>
+
+      <button type="button" class="card" data-rise data-value="coastal_walk"
+              data-label="Coastal walk and coffee">
+        <span class="card-emoji">🌊</span>
+        <span class="card-body">
+          <span class="card-title">Coastal walk and coffee</span>
+          <span class="card-blurb">Clifftop path, then somewhere for a flat white.</span>
+        </span>
+        <span class="card-tags"><span class="tag">daytime</span><span class="tag">outdoors</span></span>
+      </button>
+
+      <button type="button" class="card" data-rise data-value="pasta_and_wine"
+              data-label="Pasta and too much wine">
+        <span class="card-emoji">🍝</span>
+        <span class="card-body">
+          <span class="card-title">Pasta and too much wine</span>
+          <span class="card-blurb">A tiny place with paper menus and no bookings.</span>
+        </span>
+        <span class="card-tags"><span class="tag">evening</span><span class="tag">low-key</span></span>
+      </button>
+
+    </div>
+  </section>
+
+  <!-- ── Question: availability ───────────────────────────────────────── -->
+  <section class="block" data-question="when" data-mode="multi">
+    <h2 data-rise>When suits?</h2>
+    <p class="hint" data-rise>Choose as many as you like.</p>
+    <div class="chips">
+      <button type="button" class="chip" data-rise data-value="fri_pm"   data-label="Friday evening">Friday evening</button>
+      <button type="button" class="chip" data-rise data-value="sat_arvo" data-label="Saturday arvo">Saturday arvo</button>
+      <button type="button" class="chip" data-rise data-value="sat_pm"   data-label="Saturday evening">Saturday evening</button>
+      <button type="button" class="chip" data-rise data-value="sun_arvo" data-label="Sunday arvo">Sunday arvo</button>
+    </div>
+  </section>
+
+  <!-- ── Question: free text ──────────────────────────────────────────── -->
+  <section class="block">
+    <h2 data-rise>Anything else?</h2>
+    <textarea data-rise data-question="note" rows="3" maxlength="1000"
+              placeholder="Somewhere you'd rather go, something you can't eat, a better idea entirely…"></textarea>
+  </section>
+
+  <footer class="actions">
+    <button type="button" class="submit" id="submit" data-rise>Send it</button>
+    <p class="error" id="error" hidden></p>
+  </footer>
+
+</main>
+
+<!-- Shown once they've replied, and on any later visit. -->
+<main class="page done" id="done-view" hidden>
+  <div class="done-card">
+    <span class="done-tick">✓</span>
+    <h1>Lovely</h1>
+    <p id="done-summary" class="done-summary"></p>
+    <p class="lede">I'll sort out the details and message you.</p>
+    <button type="button" class="link-button" id="change">Change my answer</button>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

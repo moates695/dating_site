@@ -1,0 +1,22 @@
+# Secrets. This repo is public. Never commit real credentials.
+.env
+.env.*
+!.env.example
+
+# Personal page bundles. Everything under pages/ is personal content except
+# the shared starter, which is structural and safe to publish.
+pages/*
+!pages/_base/
+
+# Database dumps: these would contain real names, tokens and responses.
+*.dump
+*.sql.gz
+*.backup
+db_schema/dumps/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
