@@ -14,7 +14,8 @@ import shutil
 
 from _common import add_env_argument, settings_from_args
 
-from app.admin import add_person, connect, publish_page
+from app.admin import add_person, connect, create_person_with_token, publish_page
+from app.tokens import is_valid_token
 
 BASE_BUNDLE = "_base"
 
@@ -22,8 +23,20 @@ BASE_BUNDLE = "_base"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("name", help="display name, shown on their page")
+    parser.add_argument(
+        "--token",
+        help="use this token instead of generating one (the demo page wants a readable URL)",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="public page: never notifies, never shows one visitor's answer to the next",
+    )
     add_env_argument(parser)
     args = parser.parse_args()
+
+    if args.token and not is_valid_token(args.token):
+        raise SystemExit(f"token must be characters from the token alphabet: {args.token}")
 
     settings = settings_from_args(args)
     base_dir = settings.pages_dir / BASE_BUNDLE
@@ -31,7 +44,10 @@ def main() -> None:
         raise SystemExit(f"starter bundle missing: {base_dir / 'index.html'}")
 
     with connect(settings.database_url) as conn:
-        person = add_person(conn, args.name)
+        if args.token:
+            person = create_person_with_token(conn, args.token, args.name, is_demo=args.demo)
+        else:
+            person = add_person(conn, args.name, is_demo=args.demo)
         token = person["token"]
 
         target_dir = settings.pages_dir / token

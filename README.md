@@ -52,14 +52,17 @@ notification triggered by your own message. Those fetches are recorded as
 `kind = 'fetch'` and never notified. The context call the page makes once it is
 running in a browser is `kind = 'load'`, and that is the one that counts.
 
-**Your own visits carry `?mode=test`.** Open
-`…/d/<token>/?mode=test` and the visit is stored with `is_self` set and stays
-silent. The page passes the query string through to its context call, so the
-marker covers both requests. Nothing is stored in the browser, which is the
-point: forget the marker and you get a notification you can recognise as
-yourself, rather than a browser silently marked as yours forever. If you ever
-send someone a URL with the marker still attached, that visit is silent, so
-check the link before sending it.
+**Your own visits add `-test` to the token.** Open `…/d/<token>-test/` and the
+visit is stored with `is_self` set and stays silent. It is a suffix rather than
+a query parameter so it survives being retyped from memory, and because
+everything the page then asks for sits under the same prefix and is marked
+without the page having to carry anything across itself. The hyphen is not in
+the token alphabet, so the marker can never collide with a real token.
+
+Nothing is stored in the browser, which is the point: forget the marker and you
+get a notification you can recognise as yourself, rather than a browser silently
+marked as yours forever. If you ever send someone a URL with the marker still
+attached, that visit is silent, so check the link before sending it.
 
 ```bash
 uv run scripts/list_people.py                 # opened / not opened per person

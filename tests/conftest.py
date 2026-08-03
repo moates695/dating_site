@@ -131,6 +131,24 @@ def fake_db(live_page: LivePage) -> FakeDatabase:
 
 
 @pytest.fixture
+def demo_db(live_page: LivePage) -> FakeDatabase:
+    """A database whose one page is the public demo."""
+    import dataclasses
+
+    return FakeDatabase({TEST_TOKEN: dataclasses.replace(live_page, is_demo=True)})
+
+
+@pytest.fixture
+def demo_client(settings: Settings, demo_db: FakeDatabase):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    with TestClient(create_app(settings, db=demo_db)) as test_client:
+        yield test_client
+
+
+@pytest.fixture
 def client(settings: Settings, fake_db: FakeDatabase):
     from fastapi.testclient import TestClient
 

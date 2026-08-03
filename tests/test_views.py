@@ -61,7 +61,7 @@ def test_a_second_load_does_not_notify(client, caplog):
 
 def test_your_own_visit_is_flagged_and_silent(client, fake_db, caplog):
     with caplog.at_level(logging.INFO, logger="app.main"):
-        client.get(f"/api/d/{TEST_TOKEN}/context?mode=test")
+        client.get(f"/api/d/{TEST_TOKEN}-test/context")
 
     assert fake_db.views[0]["is_self"] is True
     assert OPENED not in caplog.text
@@ -69,8 +69,8 @@ def test_your_own_visit_is_flagged_and_silent(client, fake_db, caplog):
 
 def test_your_own_visit_does_not_use_up_the_notification(client, caplog):
     """Checking the page yourself must not make her real open look like a repeat."""
-    client.get(f"/d/{TEST_TOKEN}/?mode=test")
-    client.get(f"/api/d/{TEST_TOKEN}/context?mode=test")
+    client.get(f"/d/{TEST_TOKEN}-test/")
+    client.get(f"/api/d/{TEST_TOKEN}-test/context")
 
     with caplog.at_level(logging.INFO, logger="app.main"):
         caplog.clear()
@@ -79,18 +79,44 @@ def test_your_own_visit_does_not_use_up_the_notification(client, caplog):
     assert OPENED in caplog.text
 
 
-def test_a_wrong_marker_value_is_not_you(client, fake_db, caplog):
-    """Only the exact marker counts; anything else is treated as a real visit."""
+def test_a_wrong_marker_is_not_you(client, fake_db, caplog):
+    """Only the exact suffix counts; anything else is just an unknown token."""
     with caplog.at_level(logging.INFO, logger="app.main"):
-        client.get(f"/api/d/{TEST_TOKEN}/context?mode=live")
+        response = client.get(f"/api/d/{TEST_TOKEN}-live/context")
 
-    assert fake_db.views[0]["is_self"] is False
-    assert OPENED in caplog.text
+    assert response.status_code == 404
+    assert fake_db.views == []
+    assert OPENED not in caplog.text
 
 
 def test_the_marker_is_recorded_on_the_page_request_too(client, fake_db):
-    client.get(f"/d/{TEST_TOKEN}/?mode=test")
+    client.get(f"/d/{TEST_TOKEN}-test/")
     assert fake_db.views[0]["is_self"] is True
+
+
+def test_the_marked_page_serves_the_same_bundle(client):
+    """The suffix only marks the visit; it must not change what is served."""
+    marked = client.get(f"/d/{TEST_TOKEN}-test/")
+    plain = client.get(f"/d/{TEST_TOKEN}/")
+
+    assert marked.status_code == 200
+    assert marked.text == plain.text
+
+
+def test_assets_resolve_under_the_marked_url(client):
+    """Bundle assets are relative, so they arrive with the suffix still attached."""
+    assert client.get(f"/d/{TEST_TOKEN}-test/style.css").status_code == 200
+
+
+def test_a_submission_from_the_marked_url_still_lands(client, fake_db):
+    """The page posts from whatever URL it was opened at."""
+    response = client.post(
+        f"/api/d/{TEST_TOKEN}-test/submit",
+        json={"summary": "Rooftop cocktails", "answers": {"main": "rooftop"}},
+    )
+
+    assert response.status_code == 200
+    assert len(fake_db.responses) == 1
 
 
 def test_the_address_is_hashed_not_stored(client, fake_db):

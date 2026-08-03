@@ -3,8 +3,8 @@
  *
  * The only thing the server requires is the shape of the POST body:
  *
- *     { "summary": "Rooftop cocktails · Friday evening",
- *       "answers": { "main": "rooftop_cocktails", "when": ["fri_pm"] } }
+ *     { "summary": "Dinner out · custom message",
+ *       "answers": { "main": "dinner_out", "when": ["sat_night"], "note": "…" } }
  *
  * `answers` is stored verbatim as JSONB and never interpreted, so you can put
  * whatever you like in it. `summary` is the one line that goes to Telegram;
@@ -21,7 +21,7 @@ const FORM_TITLE = document.title;
 
 const formView = document.getElementById('form-view');
 const doneView = document.getElementById('done-view');
-const doneSummary = document.getElementById('done-summary');
+const doneHeading = document.getElementById('done-heading');
 const submitButton = document.getElementById('submit');
 const errorLine = document.getElementById('error');
 
@@ -46,28 +46,45 @@ document.addEventListener('click', (event) => {
 
 /* ── Collecting answers ────────────────────────────────────────────────── */
 
+/* The options a group owns directly, ignoring any that belong to a nested
+   group. Without this the outer "main" question would also collect the
+   follow-up choices sitting inside it, and answers.main would come back as the
+   sub-choice rather than the card. */
+function ownOptions(group) {
+  return [...group.querySelectorAll('[data-value]')]
+    .filter((element) => element.closest('[data-question]') === group);
+}
+
+/* The summary is the Telegram headline, not a receipt: the card they picked,
+   and a nod to the fact they wrote something. The follow-ups and the times go
+   with it in `answers`, which the notification prints in full underneath. */
+const SUMMARY_QUESTION = 'main';
+const NOTE_LABEL = 'custom message';
+
 function collect() {
   const answers = {};
   const parts = [];
   const missing = [];
+  // Whether any free-text box was filled in. A written answer is enough on its
+  // own, so this is what lets the required-choice check be waived below.
+  let freeText = false;
 
   document.querySelectorAll('#form-view [data-question]').forEach((group) => {
     const key = group.dataset.question;
     const mode = group.dataset.mode;
 
     if (mode === 'single') {
-      const chosen = group.querySelector('[data-value].is-selected');
+      const chosen = ownOptions(group).find((el) => el.classList.contains('is-selected'));
       if (chosen) {
         answers[key] = chosen.dataset.value;
-        parts.push(labelFor(chosen));
+        if (key === SUMMARY_QUESTION) parts.push(labelFor(chosen));
       } else if (group.hasAttribute('data-required')) {
         missing.push(group);
       }
     } else if (mode === 'multi') {
-      const chosen = [...group.querySelectorAll('[data-value].is-selected')];
+      const chosen = ownOptions(group).filter((el) => el.classList.contains('is-selected'));
       if (chosen.length) {
         answers[key] = chosen.map((el) => el.dataset.value);
-        parts.push(chosen.map(labelFor).join(', '));
       } else if (group.hasAttribute('data-required')) {
         missing.push(group);
       }
@@ -75,13 +92,17 @@ function collect() {
       const text = (group.value || '').trim();
       if (text) {
         answers[key] = text;
+        freeText = true;
       } else if (group.hasAttribute('data-required')) {
         missing.push(group);
       }
     }
   });
 
-  return { answers, summary: parts.join(' · '), missing };
+  // Last, so a note reads as an addition to the choice rather than part of it.
+  if (freeText) parts.push(NOTE_LABEL);
+
+  return { answers, summary: parts.join(' · '), missing, freeText };
 }
 
 function labelFor(element) {
@@ -91,11 +112,14 @@ function labelFor(element) {
 /* ── Submitting ────────────────────────────────────────────────────────── */
 
 submitButton.addEventListener('click', async () => {
-  const { answers, summary, missing } = collect();
+  const { answers, summary, missing, freeText } = collect();
 
-  if (missing.length) {
+  // A written note stands in for the required choices, so "none of these, how
+  // about X instead" is a sendable answer. Anything that was also selected is
+  // still collected and stored alongside it.
+  if (missing.length && !freeText) {
     missing[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    showError('Pick one to send.');
+    showError('Pick something, or leave me a note.');
     return;
   }
   if (!Object.keys(answers).length) {
@@ -120,7 +144,7 @@ submitButton.addEventListener('click', async () => {
       return;
     }
 
-    showDone(summary);
+    showDone();
   } catch {
     showError('No connection. Check your signal and try again.');
   } finally {
@@ -136,9 +160,12 @@ submitButton.addEventListener('click', async () => {
    knowing: going from display:none back to displayed restarts CSS animations,
    so each swap replays that view's entrance for free. */
 
-function showDone(summary) {
-  doneSummary.textContent = summary || '';
-  doneSummary.hidden = !summary;
+/* Picked fresh each time the confirmation appears, so changing an answer or
+   coming back later doesn't land on the same canned line twice over. */
+const DONE_HEADINGS = ['Sounds great', 'Good choice', 'See you soon'];
+
+function showDone() {
+  doneHeading.textContent = DONE_HEADINGS[Math.floor(Math.random() * DONE_HEADINGS.length)];
   indexRise(doneView);
   formView.hidden = true;
   doneView.hidden = false;
@@ -196,7 +223,7 @@ function indexRise(view) {
       greeting.textContent = `, ${context.display_name.split(' ')[0]}`;
     }
 
-    if (context.submitted) showDone('');
+    if (context.submitted) showDone();
   } catch {
     /* Offline or the endpoint is unreachable, so leave the form as it is. */
   } finally {

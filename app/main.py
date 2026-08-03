@@ -38,12 +38,18 @@ LOGGER = logging.getLogger(__name__)
 ASSET_CACHE_SECONDS = 300
 NOT_FOUND_HTML = "<!doctype html><meta charset=utf-8><title>Not found</title><p>Not found."
 
-# Your own visits carry ?mode=test. Nothing is stored in the browser, so the
-# marker only applies to the visit that carries it: forget it and you get a
-# notification you can recognise as yourself, which is a far better failure
-# than a browser silently marked as yours forever.
-OWNER_MODE_PARAM = "mode"
-OWNER_MODE_VALUE = "test"
+# Your own visits use the page URL with `-test` stuck on the end of the token,
+# e.g. /d/<token>-test/. A suffix rather than a query parameter because it
+# survives being retyped by hand and because everything the page then asks for,
+# assets and the context call alike, sits under the same prefix and is marked
+# without the page having to carry anything across itself. The hyphen is not in
+# the token alphabet, so this can never collide with a real token.
+#
+# Nothing is stored in the browser, so the marker only applies to the visit that
+# carries it: forget it and you get a notification you can recognise as
+# yourself, which is a far better failure than a browser silently marked as
+# yours forever.
+OWNER_MODE_SUFFIX = "-test"
 
 # A request for the page HTML. Link-preview crawlers make this the moment the
 # URL is sent in a message, so it is recorded but never notified.
@@ -104,6 +110,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
     async def serve_bundle(
         request: Request, token: str, asset_path: str, background: BackgroundTasks
     ):
+        token, is_self = _split_owner_marker(token)
         page = await _lookup(request, token)
         if page is None:
             return HTMLResponse(NOT_FOUND_HTML, status_code=404)
@@ -131,7 +138,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
                 request.app.state.db,
                 page,
                 VIEW_KIND_FETCH,
-                _visit_facts(request, page),
+                _visit_facts(request, page, is_self),
             )
 
         if is_index or settings.is_local:
@@ -144,6 +151,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
 
     @app.get("/api/d/{token}/context")
     async def page_context(request: Request, token: str, background: BackgroundTasks):
+        token, is_self = _split_owner_marker(token)
         page = await _lookup(request, token)
         if page is None:
             return JSONResponse({"error": "not_found"}, status_code=404)
@@ -157,27 +165,46 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
             request.app.state.db,
             page,
             VIEW_KIND_LOAD,
-            _visit_facts(request, page),
+            _visit_facts(request, page, is_self),
         )
 
         stats = await request.app.state.db.response_stats(page.page_id)
+
+        # On a normal page "someone has answered" and "you have answered" are
+        # the same thing, so the stored response is shown back as a
+        # confirmation. A demo page is opened by strangers who share nothing but
+        # the URL, so that would strand everyone after the first on a
+        # confirmation screen for an answer that was not theirs.
+        submitted = stats.count > 0 and not page.is_demo
+
         return JSONResponse(
             {
                 "display_name": page.display_name,
-                "submitted": stats.count > 0,
-                "submitted_at": stats.latest_at.isoformat() if stats.latest_at else None,
+                "submitted": submitted,
+                "submitted_at": stats.latest_at.isoformat() if submitted else None,
             },
             headers={"Cache-Control": "no-store"},
         )
 
     @app.post("/api/d/{token}/submit")
     async def submit(request: Request, token: str, background: BackgroundTasks):
+        # Submissions are never suppressed, but the page posts from whatever URL
+        # it was opened at, so the marker still has to come off first.
+        token, _ = _split_owner_marker(token)
         page = await _lookup(request, token)
         if page is None:
             return JSONResponse({"error": "not_found"}, status_code=404)
 
+        # Per page normally, because the allowance exists to stop a leaked link
+        # being used to spam Telegram. A demo page is meant to be opened by many
+        # people, so metering it per page would let one visitor lock out every
+        # other, which is why it falls back to per visitor there.
         limiter: RateLimiter = request.app.state.limiter
-        if not limiter.allow(token, time.monotonic()):
+        limit_key = token
+        if page.is_demo:
+            limit_key = f"{token}:{_hash_ip(page.token, _client_ip(request))}"
+
+        if not limiter.allow(limit_key, time.monotonic()):
             LOGGER.warning("rate limit hit for token ending %s", token[-4:])
             return JSONResponse({"error": "too_many_requests"}, status_code=429)
 
@@ -196,16 +223,20 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
             page.page_id, submission.summary, submission.answers
         )
 
-        background.add_task(
-            _notify,
-            request.app.state.settings,
-            request.app.state.db,
-            stored.response_id,
-            page.display_name,
-            submission.summary,
-            submission.answers,
-            stored.is_first,
-        )
+        # Stored either way: the demo answers are worth having, they are just
+        # not worth a phone buzzing. notified_at stays null, which is already
+        # how the CLI shows a response that never announced itself.
+        if not page.is_demo:
+            background.add_task(
+                _notify,
+                request.app.state.settings,
+                request.app.state.db,
+                stored.response_id,
+                page.display_name,
+                submission.summary,
+                submission.answers,
+                stored.is_first,
+            )
 
         return JSONResponse(
             {"ok": True, "submitted_at": stored.created_at.isoformat()},
@@ -224,9 +255,16 @@ class _Visit:
     user_agent: str | None
 
 
-def _visit_facts(request: Request, page: LivePage) -> _Visit:
+def _split_owner_marker(token: str) -> tuple[str, bool]:
+    """Separate a URL token from the `-test` marker you type on the end of it."""
+    if token.endswith(OWNER_MODE_SUFFIX):
+        return token[: -len(OWNER_MODE_SUFFIX)], True
+    return token, False
+
+
+def _visit_facts(request: Request, page: LivePage, is_self: bool) -> _Visit:
     return _Visit(
-        is_self=request.query_params.get(OWNER_MODE_PARAM) == OWNER_MODE_VALUE,
+        is_self=is_self,
         ip_hash=_hash_ip(page.token, _client_ip(request)),
         user_agent=(request.headers.get("user-agent") or "").strip()[:MAX_USER_AGENT_CHARS] or None,
     )
@@ -289,7 +327,10 @@ async def _record_view(
         LOGGER.exception("failed to record %s view of page %s", kind, page.page_id)
         return
 
-    if kind != VIEW_KIND_LOAD or visit.is_self or not view.is_first:
+    # Demo opens are still recorded, so the traffic is visible after the fact;
+    # they are just never announced. A public link would otherwise turn the one
+    # notification that means something into a stream of strangers.
+    if kind != VIEW_KIND_LOAD or visit.is_self or page.is_demo or not view.is_first:
         return
 
     message = format_view_notification(page.display_name)

@@ -1,0 +1,201 @@
+<!doctype html>
+<!--
+  The demo bundle. This is the one page in here written to be public: it is the
+  link this repo is shown with, so it holds no names, no places and no phone
+  number, and it is the only bundle under pages/ that is committed.
+
+  It is a real page, not a mock. It talks to the same endpoints as every other
+  bundle and its answers land in the same table. What makes it different is one
+  flag on the row (people.is_demo), which stops it notifying, meters submissions
+  per visitor instead of per page, and stops one stranger's answer being shown
+  back to the next.
+
+  The structure below is the contract every bundle keeps; see the comments in
+  app.js.
+-->
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<!-- Light only, so a dark-mode phone doesn't render controls against a light
+     page. theme-color matches the page so the browser chrome blends in. -->
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#fff8f3">
+<title>Pick a date</title>
+<link rel="stylesheet" href="style.css">
+<script>
+  /* Holds the entrance cascade until app.js knows whether to show the form or
+     the confirmation, otherwise the form materialises and is then replaced.
+     Must be in <head>, before anything paints.
+
+     The timeout is a failsafe: if app.js never loads or throws, this still
+     releases the page rather than leaving it blank. */
+  document.documentElement.classList.add('is-booting');
+  setTimeout(function () {
+    document.documentElement.classList.remove('is-booting');
+  }, 1200);
+</script>
+</head>
+
+<body>
+<main class="page" id="form-view">
+
+  <header class="intro">
+    <p class="kicker" data-rise>Demo</p>
+    <h1 data-rise>Hey<span id="greeting-name"></span></h1>
+    <p class="lede" data-rise>
+      A page I built to field some date options. Pick whatever you like and
+      send it, nobody gets notified.
+    </p>
+  </header>
+
+  <!-- ── Question: which idea ─────────────────────────────────────────── -->
+  <!--
+    Nested options. Each .option holds a card and the follow-up question that
+    belongs to it. Two things make this work:
+
+      the .sub is a SIBLING of the card, never inside it, because a button
+      cannot legally contain another button, and because app.js resolves a
+      click with closest('[data-question]');
+
+      the .sub carries its own data-question, so it is collected as its own
+      answer key rather than being folded into "main".
+
+    Revealing the .sub is pure CSS (.card.is-selected + .sub), so app.js needs
+    to know nothing about the nesting to show and hide it.
+
+    The three cards deliberately differ in depth: one follow-up, then two, then
+    one. Follow-ups belong to the card rather than to a fixed schema, and a page
+    where every option had the same shape would hide that.
+  -->
+  <section class="block" data-question="main" data-mode="single" data-required>
+    <h2 data-rise>What sounds good?</h2>
+    <div class="cards">
+
+      <div class="option" data-rise>
+        <button type="button" class="card" data-value="coffee" data-label="Coffee">
+          <span class="card-emoji">☕</span>
+          <span class="card-body">
+            <span class="card-title">Coffee</span>
+            <span class="card-blurb">Easy, and a good excuse to talk</span>
+          </span>
+        </button>
+        <div class="sub" data-question="coffee_where" data-mode="single">
+          <span class="sub-label">Where?</span>
+          <div class="chips">
+            <button type="button" class="chip chip-sub" data-value="cafe" data-label="A cafe">A cafe</button>
+            <button type="button" class="chip chip-sub" data-value="takeaway_walk" data-label="Takeaway and a walk">Takeaway and a walk</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="option" data-rise>
+        <button type="button" class="card" data-value="dinner" data-label="Dinner">
+          <span class="card-emoji">🍽️</span>
+          <span class="card-body">
+            <span class="card-title">Dinner</span>
+            <span class="card-blurb">Somewhere nice, and no rush</span>
+          </span>
+        </button>
+        <div class="sub" data-question="dinner_food" data-mode="single">
+          <span class="sub-label">What kind?</span>
+          <div class="chips">
+            <button type="button" class="chip chip-sub" data-value="italian" data-label="Italian">Italian</button>
+            <button type="button" class="chip chip-sub" data-value="asian" data-label="Asian">Asian</button>
+            <button type="button" class="chip chip-sub" data-value="surprise" data-label="Surprise me">Surprise me</button>
+          </div>
+        </div>
+        <div class="sub" data-question="dinner_after" data-mode="single">
+          <span class="sub-label">And afterwards?</span>
+          <div class="chips">
+            <button type="button" class="chip chip-sub" data-value="bar" data-label="A bar">A bar</button>
+            <button type="button" class="chip chip-sub" data-value="walk" data-label="A walk">A walk</button>
+            <button type="button" class="chip chip-sub" data-value="home" data-label="An early night">An early night</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="option" data-rise>
+        <button type="button" class="card" data-value="outdoors" data-label="Something outdoors">
+          <span class="card-emoji">🥾</span>
+          <span class="card-body">
+            <span class="card-title">Something outdoors</span>
+            <span class="card-blurb">Fresh air, and somewhere green</span>
+          </span>
+        </button>
+        <div class="sub" data-question="outdoors_effort" data-mode="single">
+          <span class="sub-label">How much effort?</span>
+          <div class="chips">
+            <button type="button" class="chip chip-sub" data-value="gentle" data-label="Gentle stroll">Gentle stroll</button>
+            <button type="button" class="chip chip-sub" data-value="hard" data-label="Proper hike">Proper hike</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Question: availability ───────────────────────────────────────── -->
+  <!-- Relative rather than dated, so the page cannot go stale sitting on a
+       profile for a year. -->
+  <section class="block" data-question="when" data-mode="multi">
+    <h2 data-rise>When suits?</h2>
+    <p class="hint" data-rise>Choose as many as you like.</p>
+    <div class="chips">
+      <button type="button" class="chip" data-rise data-value="weeknight" data-label="A weeknight">A weeknight</button>
+      <button type="button" class="chip" data-rise data-value="saturday"  data-label="Saturday">Saturday</button>
+      <button type="button" class="chip" data-rise data-value="sunday"    data-label="Sunday">Sunday</button>
+    </div>
+  </section>
+
+  <!-- ── Question: free text ──────────────────────────────────────────── -->
+  <!-- Writing something here is enough on its own: app.js waives the required
+       choice above when any free-text box is filled in, so "none of these, how
+       about X instead" is a sendable answer rather than a validation error. -->
+  <section class="block">
+    <h2 data-rise>Anything else?</h2>
+    <textarea data-rise data-question="note" rows="3" maxlength="1000"
+              placeholder="A better idea entirely, or just say hello…"></textarea>
+  </section>
+
+  <footer class="actions">
+    <button type="button" class="submit" id="submit" data-rise>Send it</button>
+    <p class="error" id="error" hidden></p>
+    <!-- The real page offers a phone number here. This one is public, so it
+         offers the source instead. -->
+    <p class="contact" data-rise>
+      <a href="https://github.com/moates695/dating_site">How this is built</a>
+    </p>
+  </footer>
+
+</main>
+
+<!-- Shown once they've replied. Only ever reached by submitting in this
+     session: the server reports this page as unanswered to everyone, so a
+     later visitor lands on the form rather than on someone else's ending. -->
+<main class="page done" id="done-view" hidden>
+  <div class="done-card">
+    <span class="done-tick">✓</span>
+    <!-- app.js swaps the wording each time this view appears; the text here is
+         only what shows if it never gets that far. -->
+    <h1 id="done-heading">Sounds great</h1>
+    <p class="lede">
+      That's the whole thing. On the real page this is where my phone buzzes;
+      here it goes quietly into the same table and nothing else happens.
+    </p>
+    <!-- The arrow is decorative: the label already says what the button does,
+         so it is hidden from screen readers rather than read out as "leftwards
+         arrow". -->
+    <button type="button" class="bubble-button" id="change">
+      <span class="bubble-arrow" aria-hidden="true">←</span>Change my answer
+    </button>
+    <p class="contact">
+      <a href="https://github.com/moates695/dating_site">How this is built</a>
+    </p>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

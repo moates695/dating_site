@@ -22,17 +22,21 @@ def connect(database_url: str) -> psycopg.Connection:
     return psycopg.connect(database_url, row_factory=dict_row)
 
 
-def add_person(conn: psycopg.Connection, display_name: str) -> dict[str, Any]:
+INSERT_PERSON = (
+    "insert into people (token, display_name, is_demo) values (%s, %s, %s)"
+    " returning id, token, display_name, is_demo, created_at"
+)
+
+
+def add_person(
+    conn: psycopg.Connection, display_name: str, *, is_demo: bool = False
+) -> dict[str, Any]:
     """Create a person with a fresh token. Returns the inserted row."""
     for _ in range(TOKEN_COLLISION_RETRIES):
         token = generate_token()
         try:
             with conn.transaction():
-                cursor = conn.execute(
-                    "insert into people (token, display_name) values (%s, %s)"
-                    " returning id, token, display_name, created_at",
-                    (token, display_name),
-                )
+                cursor = conn.execute(INSERT_PERSON, (token, display_name, is_demo))
                 return cursor.fetchone()
         except psycopg.errors.UniqueViolation:
             continue
@@ -40,26 +44,23 @@ def add_person(conn: psycopg.Connection, display_name: str) -> dict[str, Any]:
 
 
 def create_person_with_token(
-    conn: psycopg.Connection, token: str, display_name: str
+    conn: psycopg.Connection, token: str, display_name: str, *, is_demo: bool = False
 ) -> dict[str, Any]:
     """Create a person with a caller-supplied token.
 
     Used when publishing to a second database (prod) so the token (and
     therefore the local bundle directory name and the URL) stays identical
-    across environments.
+    across environments, and for the demo page, whose token is meant to be
+    readable rather than unguessable.
     """
     with conn.transaction():
-        cursor = conn.execute(
-            "insert into people (token, display_name) values (%s, %s)"
-            " returning id, token, display_name, created_at",
-            (token, display_name),
-        )
+        cursor = conn.execute(INSERT_PERSON, (token, display_name, is_demo))
         return cursor.fetchone()
 
 
 def get_person(conn: psycopg.Connection, token: str) -> dict[str, Any] | None:
     cursor = conn.execute(
-        "select id, token, display_name, created_at from people where token = %s",
+        "select id, token, display_name, is_demo, created_at from people where token = %s",
         (token,),
     )
     return cursor.fetchone()

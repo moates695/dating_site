@@ -3,10 +3,12 @@
 .env.*
 !.env.example
 
-# Personal page bundles. Everything under pages/ is personal content except
-# the shared starter, which is structural and safe to publish.
+# Personal page bundles. Everything under pages/ is personal content except the
+# shared starter, which is structural, and the demo page, which is written to be
+# public and is the link this repo is shown with.
 pages/*
 !pages/_base/
+!pages/trydate/
 
 # Database dumps: these would contain real names, tokens and responses.
 *.dump

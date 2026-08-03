@@ -29,6 +29,14 @@ def main() -> None:
         "--name",
         help="display name, required only when the person does not yet exist in the target database",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help=(
+            "create as the public demo page: never notifies, never shows one visitor's "
+            "answer to the next. Only read when the person is being created"
+        ),
+    )
     add_env_argument(parser)
     args = parser.parse_args()
 
@@ -48,8 +56,18 @@ def main() -> None:
                     f"{args.token} does not exist in the target database; "
                     f"pass --name to create them there"
                 )
-            person = create_person_with_token(conn, args.token, args.name)
-            print(f"created {person['display_name']} in target database")
+            person = create_person_with_token(
+                conn, args.token, args.name, is_demo=args.demo
+            )
+            kind = "demo page" if person["is_demo"] else "person"
+            print(f"created {person['display_name']} in target database ({kind})")
+        elif args.demo and not person["is_demo"]:
+            # Silently publishing a normal page over a --demo intent would mean
+            # strangers' opens ringing a phone, so refuse rather than guess.
+            raise SystemExit(
+                f"{args.token} already exists in the target database and is not a demo page; "
+                f"set people.is_demo there first, or drop --demo"
+            )
 
         version = next_version(conn, person["id"])
 

@@ -1,0 +1,409 @@
+/* Starter styles. Copy and change freely: nothing here is required by the
+   server, and every page can look completely different. */
+
+:root {
+  /* Light only. Without this a dark-mode phone still renders form controls,
+     scrollbars and autofill dark against a light page. */
+  color-scheme: light;
+
+  --bg: #fff8f3;
+  --surface: #ffffff;
+  --ink: #3b2f2b;
+  --ink-soft: #7a6a63;
+  --line: #f4e3d9;
+
+  /* Two weights of the same coral: the light one is decoration (borders,
+     fills), the deep one is anything carrying text, where it needs to clear
+     4.5:1 against white. */
+  --accent: #ef7d63;
+  --accent-deep: #ad4129;
+  --accent-soft: #fff0ea;
+  /* Hover tint, deliberately lighter than --accent-soft so hovering an option
+     never looks like it has already been chosen. */
+  --accent-wash: #fffaf6;
+  --accent-press: #96371f;
+
+  /* Kept light enough that --accent-deep still clears 4.5:1 where the washes
+     sit behind the kicker and headings. */
+  --wash-peach: rgba(255, 186, 148, .26);
+  --wash-rose: rgba(255, 168, 186, .22);
+
+  --danger: #c0392b;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(120, 70, 50, .05), 0 10px 28px rgba(120, 70, 50, .08);
+}
+
+* { box-sizing: border-box; }
+
+/* The browser's own [hidden] rule is weaker than any class that sets display,
+   so a "hidden" view would still render, and you could scroll to it. Every
+   view swap in app.js depends on this line. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  /* A soft peach-and-rose wash behind the top of the page, so it opens warm
+     rather than on a flat sheet of white. */
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(58rem 30rem at 12% -12%, var(--wash-peach), transparent 62%),
+    radial-gradient(46rem 26rem at 96% -4%, var(--wash-rose), transparent 60%);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font: 400 17px/1.55 ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+        "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 6vw, 3.5rem) 1.25rem 4rem;
+}
+
+/* ── Type ─────────────────────────────────────────────────────────────── */
+
+h1 { font-size: clamp(2rem, 8vw, 2.6rem); line-height: 1.1; margin: 0 0 .6rem; letter-spacing: -.02em; }
+h2 { font-size: 1.05rem; margin: 0 0 .85rem; letter-spacing: .01em; }
+
+.kicker {
+  margin: 0 0 .5rem;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--accent-deep);
+}
+
+.lede { margin: 0; color: var(--ink-soft); }
+.hint { margin: -.5rem 0 .85rem; font-size: .88rem; color: var(--ink-soft); }
+.intro { margin-bottom: 2.5rem; }
+.block { margin-bottom: 2.25rem; }
+
+/* ── Choice cards ─────────────────────────────────────────────────────── */
+
+.cards { display: grid; gap: .75rem; }
+
+.card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "emoji body" ".  tags";
+  gap: .25rem .9rem;
+  width: 100%;
+  padding: 1.05rem 1.1rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s, transform .18s, background .18s, box-shadow .18s;
+}
+
+/* Hover is gated on a real pointer: on a touchscreen :hover latches on after a
+   tap and the card stays lit until something else is tapped.
+
+   These sit above :active on purpose. Specificity is equal, so source order is
+   what lets a press still compress a card that is being hovered. */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    transform: translateY(-3px);
+    box-shadow: 0 2px 4px rgba(120, 70, 50, .06), 0 16px 32px rgba(239, 125, 99, .22);
+  }
+
+  .card:hover .tag { background: #fff; color: var(--accent-deep); }
+
+  /* Already coral, so the lift and a deeper glow carry the hover instead. */
+  .card.is-selected:hover {
+    background: var(--accent-soft);
+    box-shadow: 0 2px 4px rgba(120, 70, 50, .06), 0 18px 36px rgba(239, 125, 99, .3);
+  }
+}
+
+.card:active { transform: scale(.985); }
+
+.card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 1px 2px rgba(120, 70, 50, .05), 0 10px 28px rgba(239, 125, 99, .18);
+}
+
+.card-emoji { grid-area: emoji; font-size: 1.5rem; line-height: 1.3; }
+.card-body  { grid-area: body; display: block; }
+.card-title { display: block; font-weight: 600; }
+.card-blurb { display: block; margin-top: .15rem; color: var(--ink-soft); font-size: .93rem; }
+.card-tags  { grid-area: tags; display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .55rem; }
+
+.tag {
+  padding: .12rem .5rem;
+  border-radius: 999px;
+  background: #fdf1e7;
+  border: 1px solid transparent;
+  font-size: .72rem;
+  letter-spacing: .03em;
+  color: #96674a;
+}
+
+.card.is-selected .tag { background: #fff; color: var(--accent-deep); }
+
+/* ── Nested follow-up ─────────────────────────────────────────────────── */
+
+/* Revealed by the sibling selector alone, so app.js never has to know that a
+   card has a follow-up question hanging off it. The indent and the rule down
+   the left are what read as "this belongs to the card above". */
+.sub { display: none; }
+
+/* A general sibling combinator, not an adjacent one: a card can carry more
+   than one follow-up, and "+" would only ever reveal the first. */
+.card.is-selected ~ .sub {
+  display: block;
+  margin: .6rem 0 0 1.4rem;
+  padding-left: .95rem;
+  border-left: 2px solid var(--accent-soft);
+  animation: rise .32s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+/* Second and later follow-ups land just behind the first, so a card with two
+   of them cascades rather than snapping open in one block. */
+.card.is-selected ~ .sub + .sub { animation-delay: 70ms; }
+
+.sub-label {
+  display: block;
+  margin-bottom: .5rem;
+  font-size: .82rem;
+  letter-spacing: .02em;
+  color: var(--ink-soft);
+}
+
+/* A touch smaller than a top-level chip, so the hierarchy is legible even once
+   a follow-up is open. */
+.chip-sub { padding: .45rem .9rem; font-size: .88rem; }
+
+/* ── Chips ────────────────────────────────────────────────────────────── */
+
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.chip {
+  padding: .6rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: .93rem;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s, box-shadow .18s, color .18s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent-deep);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(239, 125, 99, .22);
+  }
+
+  .chip.is-selected:hover {
+    background: var(--accent-soft);
+    box-shadow: 0 10px 22px rgba(239, 125, 99, .3);
+  }
+}
+
+.chip:active { transform: scale(.96); }
+.chip.is-selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
+
+/* ── Text input ───────────────────────────────────────────────────────── */
+
+textarea {
+  width: 100%;
+  padding: .9rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: .95rem;
+  resize: vertical;
+  transition: border-color .18s;
+}
+
+textarea::placeholder { color: #b09a90; }
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* ── Actions ──────────────────────────────────────────────────────────── */
+
+.submit {
+  width: 100%;
+  padding: 1.05rem;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent-deep);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(173, 65, 41, .28);
+  font: inherit;
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  cursor: pointer;
+  transition: transform .18s, opacity .18s, box-shadow .18s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .submit:hover {
+    background: var(--accent-press);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgba(173, 65, 41, .34);
+  }
+
+  /* Disabled while sending, so leave it inert rather than inviting another click. */
+  .submit[disabled]:hover { background: var(--accent-deep); transform: none; box-shadow: 0 8px 20px rgba(173, 65, 41, .28); }
+
+  .bubble-button:hover {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent-deep);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(239, 125, 99, .22);
+  }
+
+  /* The arrow backs away in the direction it points, which is the whole reason
+     it is a separate span. */
+  .bubble-button:hover .bubble-arrow { transform: translateX(-3px); }
+
+  .contact a:hover { border-bottom-color: var(--accent); }
+}
+
+.submit:active { transform: scale(.985); box-shadow: 0 4px 12px rgba(173, 65, 41, .24); }
+.submit[disabled] { opacity: .55; cursor: default; }
+.bubble-button:active { transform: scale(.96); }
+
+.error { margin: .85rem 0 0; color: var(--danger); font-size: .9rem; text-align: center; }
+
+.contact {
+  margin: 1.25rem 0 0;
+  color: var(--ink-soft);
+  font-size: .88rem;
+  text-align: center;
+}
+
+.contact a {
+  color: var(--accent-deep);
+  font-weight: 600;
+  /* Underlined with a border rather than text-decoration so the line can be
+     kept off the digits and animated on hover. */
+  text-decoration: none;
+  border-bottom: 1.5px solid var(--accent-soft);
+  padding-bottom: 1px;
+  transition: border-color .18s;
+}
+
+/* Pill-shaped, sharing the chip's border, radius and hover language so the
+   confirmation screen does not introduce a control that looks foreign. */
+.bubble-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: 1.75rem;
+  /* Tighter on the arrow side so the pill looks optically centred. */
+  padding: .7rem 1.3rem .7rem 1.05rem;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s, box-shadow .18s, color .18s;
+}
+
+.bubble-arrow {
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: transform .18s;
+}
+
+/* ── Confirmation ─────────────────────────────────────────────────────── */
+
+/* A screen of its own. The form is removed from the document when this shows,
+   so this is the whole page rather than a section underneath it. */
+.done {
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  padding: clamp(1.5rem, 6vw, 3.5rem) 1.25rem;
+  text-align: center;
+}
+
+.done-card {
+  max-width: 24rem;
+  animation: rise .45s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+.done-tick {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: 0 auto 1.25rem;
+  border-radius: 999px;
+  background: var(--accent-deep);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(173, 65, 41, .26);
+  font-size: 1.5rem;
+  animation: pop .45s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ── Entrance ─────────────────────────────────────────────────────────── */
+
+/* Anything marked data-rise materialises in, one after another down the page.
+   app.js sets --i in document order, so nothing here needs renumbering when a
+   section is added or moved. */
+[data-rise] {
+  animation: rise .5s cubic-bezier(.2, .7, .3, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* Held, including the delay countdown, until app.js has picked a view, so
+   the cascade starts from that moment rather than part-way through. Released
+   by app.js, or by the failsafe timer in index.html. */
+.is-booting [data-rise] { animation-play-state: paused; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px) scale(.99); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Focus ────────────────────────────────────────────────────────────── */
+
+/* Keyboard parity for the hover states above, which a pointer-less visitor
+   never sees. :focus-visible, so a mouse click doesn't leave a ring behind. */
+.card:focus-visible,
+.chip:focus-visible,
+.submit:focus-visible,
+.bubble-button:focus-visible,
+.contact a:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+
+  /* Without a transition to carry it, the lift becomes a jump. Keep the colour
+     and shadow half of the highlight, drop the movement. */
+  .card:hover, .chip:hover, .submit:hover, .bubble-button:hover { transform: none; }
+  .bubble-button:hover .bubble-arrow { transform: none; }
+}

@@ -22,6 +22,10 @@ class LivePage:
     token: str
     display_name: str
     bundle_dir: str
+    # A public page many strangers open, rather than one person's invitation.
+    # Never notifies, never shows anyone else's answer back to them, and meters
+    # submissions per visitor instead of per page.
+    is_demo: bool = False
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,8 @@ class Database:
                        pe.id   as person_id,
                        pe.token,
                        pe.display_name,
-                       pg.bundle_dir
+                       pg.bundle_dir,
+                       pe.is_demo
                   from people pe
                   join pages  pg on pg.person_id = pe.id and pg.is_live
                  where pe.token = %s
