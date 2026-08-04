@@ -52,12 +52,13 @@ def format_notification(display_name: str, summary: str, answers: dict, *, is_fi
 def format_view_notification(display_name: str) -> str:
     """Build the message for a first open.
 
-    Only ever sent once per page, so it says so: the silence afterwards is the
-    design, not a page that stopped working or a notification that went
-    missing.
+    One line and nothing else. It is still only ever sent once per page, but
+    saying so in the message meant every open arrived with a paragraph
+    explaining itself; the full history is in page_views if you want it
+    (scripts/list_people.py --views <token>).
     """
     name = clean_text(display_name, 100)
-    return f"👀 {name} opened the page\n\nFirst open. There is no second view notification."
+    return f"👀 {name} opened the page"
 
 
 async def send_notification(bot_token: str, chat_id: str, message: str) -> bool:

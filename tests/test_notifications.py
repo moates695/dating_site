@@ -56,9 +56,9 @@ def test_a_view_reads_as_an_open():
     assert format_view_notification("Someone").splitlines()[0] == "👀 Someone opened the page"
 
 
-def test_a_view_says_it_will_not_repeat():
-    """The silence afterwards is the design, not a page that stopped working."""
-    assert "no second view notification" in format_view_notification("Someone")
+def test_a_view_is_one_line_and_nothing_else():
+    """An open is the whole message; anything more is a paragraph you reread every time."""
+    assert format_view_notification("Someone") == "👀 Someone opened the page"
 
 
 def test_a_view_notification_strips_control_characters():
