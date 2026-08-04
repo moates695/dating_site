@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ssh do:*)"
+      "Bash(ssh do:*)",
+      "Bash(ssh:*\\)\rBash\\(rsync:*)",
+      "Bash(ssh:*)",
+      "Bash(rsync:*)"
     ]
   }
 }

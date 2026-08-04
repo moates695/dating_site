@@ -3,9 +3,14 @@
 Personalised one-page date-idea invitations, served from opaque URLs. No login:
 knowing the link is the credential. Replies land in Postgres and ping Telegram.
 
-**This repo is public.** It contains the engine and the shared starter page,
-never a name, a token, a page bundle or a response. Those live in the database
-and in `pages/<token>/`, which is gitignored.
+**[Try it](https://date.moates.com.au/d/trydate/)** ·
+`date.moates.com.au/d/trydate/` is a public demo. It is a real page on the live
+app, not a mock, and it is the one bundle in this repo that is committed
+(`pages/trydate/`). See [The demo page](#the-demo-page).
+
+**This repo is public.** It contains the engine, the shared starter page and the
+demo, never a name, a token, a personal page bundle or a response. Those live in
+the database and in `pages/<token>/`, which is gitignored.
 
 ## How it fits together
 
@@ -72,6 +77,36 @@ uv run scripts/list_people.py --views <token> # every view, labelled
 Only the *first* real open notifies. Coming back later is recorded but silent.
 Addresses are stored as a salted hash, never raw, which is enough to tell two
 visitors apart and to spot a forwarded link.
+
+## The demo page
+
+`pages/trydate/` is linked from a public profile, so it is opened by strangers
+who share nothing but the URL. Three things every other page does are wrong for
+it, and all three hang off one flag, `people.is_demo`:
+
+**It never notifies.** Neither opening it nor answering it sends anything.
+
+**It never shows one visitor the previous one's answer.** Everywhere else
+"someone has answered" and "you have answered" are the same thing, so the stored
+reply is handed back as a confirmation. Here that would strand everyone after
+the first on someone else's ending, so the page reports itself unanswered to
+each new visitor.
+
+**Submissions are metered per visitor** rather than per page, keyed on the same
+salted address hash used for views, so one stranger hammering it cannot use up
+the allowance for everyone else.
+
+Answers still land in the same table and opens are still recorded: silent, not
+invisible.
+
+```bash
+uv run scripts/publish.py trydate --name "there" --demo --env-file .env.prod
+```
+
+The flag sits on `people` rather than `pages`, so republishing cannot drop it.
+`--demo` is read only when the person is being created, and publishing with it
+against an existing non-demo person is refused rather than guessed at, because
+getting that wrong means every stranger's open ringing a phone.
 
 ## Local setup
 
@@ -185,5 +220,6 @@ of `app.db.Database`.
 | `app/db.py` / `app/admin.py` | request-path queries / CLI queries |
 | `db_schema/migrations/` | numbered SQL, applied by `scripts/migrate.py` |
 | `pages/_base/` | starter bundle, copied for each new person |
+| `pages/trydate/` | the public demo bundle, the only committed one |
 | `docker-compose.dev.yml` | local Postgres for development |
 | `deploy/` | compose file, nginx block, deploy script |
