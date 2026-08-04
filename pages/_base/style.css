@@ -1,9 +1,16 @@
 /* Starter styles. Copy and change freely: nothing here is required by the
    server, and every page can look completely different. */
 
+/* ── Palette ──────────────────────────────────────────────────────────── */
+
+/* Light and dark are the same page re-tinted. Every rule past this block is
+   written against these tokens and nothing else, so a scheme is a set of
+   values rather than a second copy of the stylesheet.
+
+   That is why things that look like one-offs are tokens too: a tag fill, the
+   placeholder ink, every shadow. Each is a colour that has to change when the
+   page goes dark, and a literal left in a rule below is one that won't. */
 :root {
-  /* Light only. Without this a dark-mode phone still renders form controls,
-     scrollbars and autofill dark against a light page. */
   color-scheme: light;
 
   --bg: #fff8f3;
@@ -14,19 +21,83 @@
 
   /* Two weights of the same coral: the light one is decoration (borders,
      fills), the deep one is anything carrying text, where it needs to clear
-     4.5:1 against white. */
+     4.5:1 against what sits behind it. --on-accent is the other direction:
+     text sitting on top of --accent-deep. */
   --accent: #ef7d63;
   --accent-deep: #ad4129;
   --accent-soft: #fff0ea;
+  --on-accent: #ffffff;
 
   /* Kept light enough that --accent-deep still clears 4.5:1 where the washes
      sit behind the kicker and headings. */
   --wash-peach: rgba(255, 186, 148, .26);
   --wash-rose: rgba(255, 168, 186, .22);
 
+  --tag-bg: #fdf1e7;
+  --tag-ink: #96674a;
+  /* A tag on a card that is lit up. The card is coral underneath it by then,
+     so the tag goes plain to stay separate from it. */
+  --tag-bg-on: #ffffff;
+
+  --placeholder: #b09a90;
   --danger: #c0392b;
   --radius: 18px;
+
+  /* A shadow on a light page is the page in shade, so these are warm brown at
+     low alpha. --shadow-glow is the coral one thrown by a selected card, where
+     the colour is part of the highlight rather than depth. */
   --shadow: 0 1px 2px rgba(120, 70, 50, .05), 0 10px 28px rgba(120, 70, 50, .08);
+  --shadow-glow: 0 1px 2px rgba(120, 70, 50, .05), 0 10px 28px rgba(239, 125, 99, .18);
+  --shadow-submit: 0 8px 20px rgba(173, 65, 41, .28);
+  --shadow-submit-press: 0 4px 12px rgba(173, 65, 41, .24);
+  --shadow-tick: 0 10px 24px rgba(173, 65, 41, .26);
+}
+
+/* Follows the device setting, with no switch on the page: this is a link
+   someone opens once, so the right scheme is whichever one their phone is
+   already in. Warm rather than neutral greys, so it reads as this page at
+   night instead of a different one.
+
+   The coral has to invert. On white, --accent-deep is dark enough to carry
+   text; on a dark page it has to be light enough to do the same job, which
+   also turns the send button into a light fill, so --on-accent flips with it.
+   Everything downstream of those two follows without a rule changing. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #16100f;
+    --surface: #221a18;
+    --ink: #f3e8e3;
+    --ink-soft: #b8a49c;
+    --line: #3a2c28;
+
+    --accent: #ef7d63;
+    --accent-deep: #ffab92;
+    --accent-soft: #3a2320;
+    --on-accent: #2a1310;
+
+    /* Dimmer than their light counterparts by more than looks right written
+       down: the same alpha over near-black reads as a haze, not a wash. */
+    --wash-peach: rgba(255, 138, 92, .13);
+    --wash-rose: rgba(255, 110, 140, .1);
+
+    --tag-bg: #2e2320;
+    --tag-ink: #c3a496;
+    --tag-bg-on: #1e1413;
+
+    --placeholder: #9a8279;
+    --danger: #ff8f7d;
+
+    /* Brown at 8% is invisible here, so depth comes from near-black instead.
+       The coral glow stays and does most of the work of separating a selected
+       card from the page, since there is no longer much shade to do it. */
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 28px rgba(0, 0, 0, .45);
+    --shadow-glow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 28px rgba(239, 125, 99, .16);
+    --shadow-submit: 0 8px 20px rgba(0, 0, 0, .5);
+    --shadow-submit-press: 0 4px 12px rgba(0, 0, 0, .45);
+    --shadow-tick: 0 10px 24px rgba(0, 0, 0, .5);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -103,7 +174,7 @@ h2 { font-size: 1.05rem; margin: 0 0 .85rem; letter-spacing: .01em; }
 .card.is-selected {
   border-color: var(--accent);
   background: var(--accent-soft);
-  box-shadow: 0 1px 2px rgba(120, 70, 50, .05), 0 10px 28px rgba(239, 125, 99, .18);
+  box-shadow: var(--shadow-glow);
 }
 
 .card-emoji { grid-area: emoji; font-size: 1.5rem; line-height: 1.3; }
@@ -115,14 +186,14 @@ h2 { font-size: 1.05rem; margin: 0 0 .85rem; letter-spacing: .01em; }
 .tag {
   padding: .12rem .5rem;
   border-radius: 999px;
-  background: #fdf1e7;
+  background: var(--tag-bg);
   border: 1px solid transparent;
   font-size: .72rem;
   letter-spacing: .03em;
-  color: #96674a;
+  color: var(--tag-ink);
 }
 
-.card.is-selected .tag { background: #fff; color: var(--accent-deep); }
+.card.is-selected .tag { background: var(--tag-bg-on); color: var(--accent-deep); }
 
 /* ── Chips ────────────────────────────────────────────────────────────── */
 
@@ -158,7 +229,7 @@ textarea {
   transition: border-color .18s;
 }
 
-textarea::placeholder { color: #b09a90; }
+textarea::placeholder { color: var(--placeholder); }
 textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -173,8 +244,8 @@ textarea:focus {
   border: none;
   border-radius: var(--radius);
   background: var(--accent-deep);
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(173, 65, 41, .28);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-submit);
   font: inherit;
   font-size: 1.02rem;
   font-weight: 600;
@@ -183,7 +254,7 @@ textarea:focus {
   transition: transform .18s, opacity .18s, box-shadow .18s;
 }
 
-.submit:active { transform: scale(.985); box-shadow: 0 4px 12px rgba(173, 65, 41, .24); }
+.submit:active { transform: scale(.985); box-shadow: var(--shadow-submit-press); }
 .submit[disabled] { opacity: .55; cursor: default; }
 
 .error { margin: .85rem 0 0; color: var(--danger); font-size: .9rem; text-align: center; }
@@ -226,8 +297,8 @@ textarea:focus {
   margin: 0 auto 1.25rem;
   border-radius: 999px;
   background: var(--accent-deep);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(173, 65, 41, .26);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-tick);
   font-size: 1.5rem;
   animation: pop .45s cubic-bezier(.2, 1.4, .4, 1) both;
 }

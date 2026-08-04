@@ -22,10 +22,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<!-- Light only, so a dark-mode phone doesn't render controls against a light
-     page. theme-color matches the page so the browser chrome blends in. -->
-<meta name="color-scheme" content="light">
-<meta name="theme-color" content="#fff8f3">
+<!-- Both schemes, chosen from the device setting; the stylesheet holds the two
+     palettes. This line is what stops a dark-mode phone rendering its own
+     controls, scrollbars and autofill against the wrong one. The paired
+     theme-colors keep the browser chrome on whichever palette is showing. -->
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fff8f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16100f" media="(prefers-color-scheme: dark)">
 <title>An idea or two</title>
 <link rel="stylesheet" href="style.css">
 <script>
