@@ -16,6 +16,12 @@ pages/*
 *.backup
 db_schema/dumps/
 
+# Scratch notes. These are where page content gets drafted, so they hold the
+# same names and places the bundles do.
+temp.md
+scratch.md
+notes.md
+
 # Python
 __pycache__/
 *.py[cod]
