@@ -8,7 +8,7 @@
 # public and is the link this repo is shown with.
 pages/*
 !pages/_base/
-!pages/trydate/
+!pages/tryevents/
 
 # Database dumps: these would contain real names, tokens and responses.
 *.dump

@@ -6,7 +6,7 @@
   all fine.
 
   The only contract with the server is in app.js: POST {summary, answers} to
-  /api/d/<token>/submit. Everything else is yours.
+  /api/e/<token>/submit. Everything else is yours.
 
   Structural bits worth keeping:
     data-question="key"   an answer key in the stored JSON
@@ -49,7 +49,7 @@
 <main class="page" id="form-view">
 
   <header class="intro">
-    <p class="kicker" data-rise>Date ideas</p>
+    <p class="kicker" data-rise>Event ideas</p>
     <h1 data-rise>Hello<span id="greeting-name"></span></h1>
     <p class="lede" data-rise>
       I had a few ideas. Pick whichever one you like the look of, or tell me
@@ -62,31 +62,31 @@
     <h2 data-rise>What sounds good?</h2>
     <div class="cards">
 
-      <button type="button" class="card" data-rise data-value="rooftop_cocktails"
-              data-label="Rooftop cocktails">
-        <span class="card-emoji">🍸</span>
+      <button type="button" class="card" data-rise data-value="coffee"
+              data-label="Coffee somewhere">
+        <span class="card-emoji">☕</span>
         <span class="card-body">
-          <span class="card-title">Rooftop cocktails</span>
-          <span class="card-blurb">Somewhere with a view and a decent negroni.</span>
+          <span class="card-title">Coffee somewhere</span>
+          <span class="card-blurb">Decent coffee and a table to actually sit at.</span>
         </span>
-        <span class="card-tags"><span class="tag">evening</span><span class="tag">city</span></span>
+        <span class="card-tags"><span class="tag">daytime</span><span class="tag">easy</span></span>
       </button>
 
       <button type="button" class="card" data-rise data-value="coastal_walk"
-              data-label="Coastal walk and coffee">
+              data-label="Coastal walk">
         <span class="card-emoji">🌊</span>
         <span class="card-body">
-          <span class="card-title">Coastal walk and coffee</span>
+          <span class="card-title">Coastal walk</span>
           <span class="card-blurb">Clifftop path, then somewhere for a flat white.</span>
         </span>
         <span class="card-tags"><span class="tag">daytime</span><span class="tag">outdoors</span></span>
       </button>
 
-      <button type="button" class="card" data-rise data-value="pasta_and_wine"
-              data-label="Pasta and too much wine">
+      <button type="button" class="card" data-rise data-value="dinner"
+              data-label="Dinner out">
         <span class="card-emoji">🍝</span>
         <span class="card-body">
-          <span class="card-title">Pasta and too much wine</span>
+          <span class="card-title">Dinner out</span>
           <span class="card-blurb">A tiny place with paper menus and no bookings.</span>
         </span>
         <span class="card-tags"><span class="tag">evening</span><span class="tag">low-key</span></span>
@@ -125,7 +125,7 @@
 <main class="page done" id="done-view" hidden>
   <div class="done-card">
     <span class="done-tick">✓</span>
-    <h1>Lovely</h1>
+    <h1>Locked in</h1>
     <p id="done-summary" class="done-summary"></p>
     <p class="lede">I'll sort out the details and message you.</p>
     <button type="button" class="link-button" id="change">Change my answer</button>

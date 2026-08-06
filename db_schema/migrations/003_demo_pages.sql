@@ -1,7 +1,7 @@
 -- Demo pages.
 --
 -- One page is public: it is linked from a GitHub profile, so strangers open it
--- rather than one invited person. That breaks three assumptions this schema was
+-- rather than one invited recipient. That breaks three assumptions this schema was
 -- built on, all of which follow from "a page belongs to one person":
 --
 --   the confirmation screen is shown to anyone visiting a page that has any

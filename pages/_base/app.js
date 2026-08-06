@@ -16,7 +16,7 @@
  */
 
 const TOKEN = location.pathname.split('/').filter(Boolean)[1];
-const API = `/api/d/${TOKEN}`;
+const API = `/api/e/${TOKEN}`;
 const FORM_TITLE = document.title;
 
 const formView = document.getElementById('form-view');

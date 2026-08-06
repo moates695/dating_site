@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Deploy the dating site to the production droplet.
+# Deploy the event picker to the production droplet.
 #
 #   1. Ships the current committed code (git HEAD) to the droplet build context.
 #   2. Rebuilds the image and recreates the container via docker compose.
@@ -8,7 +8,7 @@
 #   4. Verifies the container is up and the public endpoint answers.
 #
 # This only ships application code. Page bundles are shipped separately by
-# scripts/publish.py, and /opt/dating_site/.env is managed by hand on the
+# scripts/publish.py, and /opt/event_picker/.env is managed by hand on the
 # droplet; neither is touched here.
 #
 # Usage:
@@ -16,16 +16,16 @@
 #   deploy/deploy.sh --allow-dirty  # deploy HEAD even with a dirty tree
 #
 # Config (override via env):
-#   DATES_SSH_HOST    ssh host/alias for the droplet  (default: do)
-#   DATES_REMOTE_DIR  build context on the droplet    (default: /opt/dating_site)
-#   DATES_URL         public endpoint to verify       (default: https://date.moates.com.au/healthz)
+#   EVENTS_SSH_HOST    ssh host/alias for the droplet  (default: do)
+#   EVENTS_REMOTE_DIR  build context on the droplet    (default: /opt/event_picker)
+#   EVENTS_URL         public endpoint to verify       (default: https://events.moates.com.au/healthz)
 
 set -euo pipefail
 
-SSH_HOST="${DATES_SSH_HOST:-do}"
-REMOTE_DIR="${DATES_REMOTE_DIR:-/opt/dating_site}"
-PUBLIC_URL="${DATES_URL:-https://date.moates.com.au/healthz}"
-CONTAINER="dates-prod"
+SSH_HOST="${EVENTS_SSH_HOST:-do}"
+REMOTE_DIR="${EVENTS_REMOTE_DIR:-/opt/event_picker}"
+PUBLIC_URL="${EVENTS_URL:-https://events.moates.com.au/healthz}"
+CONTAINER="events-prod"
 
 ALLOW_DIRTY=0
 [[ "${1:-}" == "--allow-dirty" ]] && ALLOW_DIRTY=1
@@ -39,7 +39,7 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 # --- Preflight -------------------------------------------------------------
 command -v git >/dev/null || die "git not found"
-git rev-parse --git-dir >/dev/null 2>&1 || die "not inside the dating_site git repo"
+git rev-parse --git-dir >/dev/null 2>&1 || die "not inside the event_picker git repo"
 
 REV="$(git rev-parse --short HEAD)"
 
@@ -69,7 +69,7 @@ ok "container started"
 
 # --- Migrate ---------------------------------------------------------------
 log "applying migrations"
-ssh "$SSH_HOST" "cd $REMOTE_DIR/deploy && docker compose exec -T dates python scripts/migrate.py"
+ssh "$SSH_HOST" "cd $REMOTE_DIR/deploy && docker compose exec -T events python scripts/migrate.py"
 ok "migrations applied"
 
 # --- Verify ----------------------------------------------------------------

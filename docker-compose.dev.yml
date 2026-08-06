@@ -9,29 +9,29 @@
 # 127.0.0.1 only and holds nothing but throwaway test rows. Real credentials
 # belong in .env, which is gitignored.
 
-name: dating-site-dev
+name: event-picker-dev
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: dating-postgres-dev
+    container_name: events-postgres-dev
     restart: unless-stopped
     environment:
-      POSTGRES_USER: dating
-      POSTGRES_PASSWORD: dating
-      POSTGRES_DB: dating_dev
+      POSTGRES_USER: events
+      POSTGRES_PASSWORD: events
+      POSTGRES_DB: event_picker_dev
     ports:
       # Bound to loopback so it is never reachable from the network. 5433 on the
       # host because Docker Desktop forwards through Windows, where 5432 is
       # already taken.
       - "127.0.0.1:5433:5432"
     volumes:
-      - dating-pgdata:/var/lib/postgresql/data
+      - events-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dating -d dating_dev"]
+      test: ["CMD-SHELL", "pg_isready -U events -d event_picker_dev"]
       interval: 5s
       timeout: 3s
       retries: 12
 
 volumes:
-  dating-pgdata:
+  events-pgdata:

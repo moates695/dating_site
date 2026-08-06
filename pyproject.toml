@@ -1,7 +1,7 @@
 [project]
-name = "dating-site"
+name = "event-picker"
 version = "0.1.0"
-description = "Personalised date-idea pages served from opaque capability URLs"
+description = "Personalised event-picker pages served from opaque capability URLs"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

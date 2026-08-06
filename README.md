@@ -1,12 +1,12 @@
-# dating_site
+# event_picker
 
-Personalised one-page date-idea invitations, served from opaque URLs. No login:
-knowing the link is the credential. Replies land in Postgres and ping Telegram.
+Personalised one-page event pickers, served from opaque URLs. No login: knowing
+the link is the credential. Replies land in Postgres and ping Telegram.
 
-**[Try it](https://date.moates.com.au/d/trydate/)** ·
-`date.moates.com.au/d/trydate/` is a public demo. It is a real page on the live
-app, not a mock, and it is the one bundle in this repo that is committed
-(`pages/trydate/`). See [The demo page](#the-demo-page).
+**[Try it](https://events.moates.com.au/e/tryevents/)** ·
+`events.moates.com.au/e/tryevents/` is a public demo. It is a real page on the
+live app, not a mock, and it is the one bundle in this repo that is committed
+(`pages/tryevents/`). See [The demo page](#the-demo-page).
 
 **This repo is public.** It contains the engine, the shared starter page and the
 demo, never a name, a token, a personal page bundle or a response. Those live in
@@ -15,10 +15,10 @@ the database and in `pages/<token>/`, which is gitignored.
 ## How it fits together
 
 ```
-date.moates.com.au/d/<token>/
+events.moates.com.au/e/<token>/
         │
         ▼
-  nginx-proxy-prod ──► dates-prod (FastAPI) ──► Postgres 16 (host)
+  nginx-proxy-prod ──► events-prod (FastAPI) ──► Postgres 16 (host)
                               │
                               └──► Telegram (notification only)
 ```
@@ -28,8 +28,8 @@ live bundle, serves that bundle's static files, and accepts whatever JSON the
 bundle posts back:
 
 ```json
-{ "summary": "Rooftop cocktails · Friday evening",
-  "answers": { "main": "rooftop_cocktails", "when": ["fri_pm"] } }
+{ "summary": "Dinner out · Friday evening",
+  "answers": { "main": "dinner", "when": ["fri_pm"] } }
 ```
 
 `answers` is stored verbatim as JSONB and never interpreted. `summary` is the
@@ -46,7 +46,7 @@ loses the reply. `scripts/list_people.py --responses <token>` shows those.
 ## Knowing whether a page was opened
 
 Opens are recorded in `page_views`, and the first real one pings Telegram. The
-point is to tell *the link never arrived* apart from *she has seen it and is
+point is to tell *the link never arrived* apart from *they have seen it and are
 thinking*, so it deliberately stays at opened / not opened.
 
 Two things make that signal honest:
@@ -57,7 +57,7 @@ notification triggered by your own message. Those fetches are recorded as
 `kind = 'fetch'` and never notified. The context call the page makes once it is
 running in a browser is `kind = 'load'`, and that is the one that counts.
 
-**Your own visits add `-test` to the token.** Open `…/d/<token>-test/` and the
+**Your own visits add `-test` to the token.** Open `…/e/<token>-test/` and the
 visit is stored with `is_self` set and stays silent. It is a suffix rather than
 a query parameter so it survives being retyped from memory, and because
 everything the page then asks for sits under the same prefix and is marked
@@ -80,7 +80,7 @@ visitors apart and to spot a forwarded link.
 
 ## The demo page
 
-`pages/trydate/` is linked from a public profile, so it is opened by strangers
+`pages/tryevents/` is linked from a public profile, so it is opened by strangers
 who share nothing but the URL. Three things every other page does are wrong for
 it, and all three hang off one flag, `people.is_demo`:
 
@@ -100,7 +100,7 @@ Answers still land in the same table and opens are still recorded: silent, not
 invisible.
 
 ```bash
-uv run scripts/publish.py trydate --name "there" --demo --env-file .env.prod
+uv run scripts/publish.py tryevents --name "there" --demo --env-file .env.prod
 ```
 
 The flag sits on `people` rather than `pages`, so republishing cannot drop it.
@@ -181,14 +181,14 @@ Only needed when the app itself changes, not when adding a person or a page.
 
 One-time setup on the droplet:
 
-1. Create `/opt/dating_site/.env`. Same shape as `.env.example`, but the
+1. Create `/opt/event_picker/.env`. Same shape as `.env.example`, but the
    container reaches Postgres on the host, not through the tunnel:
-   `DATABASE_URL=postgresql://dating:PASSWORD@host.docker.internal:5432/dating`,
+   `DATABASE_URL=postgresql://events:PASSWORD@host.docker.internal:5432/event_picker`,
    `APP_ENV=prod`, `PAGES_DIR=/srv/pages`, plus the Telegram credentials.
-2. Add the server block in `deploy/nginx-dates.conf` to
+2. Add the server block in `deploy/nginx-events.conf` to
    `/root/gym_junkie_server/nginx/nginx.conf.template`, then
    `ssh do docker restart nginx-proxy-prod`.
-3. Add a proxied A record for `date.moates.com.au` in Cloudflare pointing at
+3. Add a proxied A record for `events.moates.com.au` in Cloudflare pointing at
    the droplet. The wildcard `*.moates.com.au` origin certificate already covers
    the subdomain, so there is no certificate work.
 
@@ -220,6 +220,6 @@ of `app.db.Database`.
 | `app/db.py` / `app/admin.py` | request-path queries / CLI queries |
 | `db_schema/migrations/` | numbered SQL, applied by `scripts/migrate.py` |
 | `pages/_base/` | starter bundle, copied for each new person |
-| `pages/trydate/` | the public demo bundle, the only committed one |
+| `pages/tryevents/` | the public demo bundle, the only committed one |
 | `docker-compose.dev.yml` | local Postgres for development |
 | `deploy/` | compose file, nginx block, deploy script |

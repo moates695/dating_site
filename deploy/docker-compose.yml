@@ -1,27 +1,27 @@
-# Deployment for the dating site on the droplet.
+# Deployment for the event picker on the droplet.
 #
 # The container joins the shared reverse-proxy network so nginx-proxy-prod can
-# route date.moates.com.au to dates-prod:8000 by name. It publishes no host
+# route events.moates.com.au to events-prod:8000 by name. It publishes no host
 # port; nginx reaches it over the docker network.
 #
 # Do not run this by hand on the droplet. Deploy from a clone of this repo with:
 #
 #     deploy/deploy.sh
 
-name: dating-site
+name: event-picker
 
 services:
-  dates:
+  events:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: dating-site:latest
-    container_name: dates-prod
+    image: event-picker:latest
+    container_name: events-prod
     restart: unless-stopped
 
     # Holds DATABASE_URL and the Telegram credentials. Lives only on the
     # droplet; it is never in this repo. See README for its contents.
-    env_file: /opt/dating_site/.env
+    env_file: /opt/event_picker/.env
 
     environment:
       APP_ENV: prod
@@ -30,7 +30,7 @@ services:
     volumes:
       # Published page bundles. Read-only: the app only ever serves from here,
       # publish.py writes to it over rsync.
-      - /opt/dating_site/pages:/srv/pages:ro
+      - /opt/event_picker/pages:/srv/pages:ro
 
     # Postgres runs on the host, not in Docker. pg_hba.conf already allows the
     # 172.16.0.0/12 docker ranges.

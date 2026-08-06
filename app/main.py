@@ -39,7 +39,7 @@ ASSET_CACHE_SECONDS = 300
 NOT_FOUND_HTML = "<!doctype html><meta charset=utf-8><title>Not found</title><p>Not found."
 
 # Your own visits use the page URL with `-test` stuck on the end of the token,
-# e.g. /d/<token>-test/. A suffix rather than a query parameter because it
+# e.g. /e/<token>-test/. A suffix rather than a query parameter because it
 # survives being retyped by hand and because everything the page then asks for,
 # assets and the context call alike, sits under the same prefix and is marked
 # without the page having to carry anything across itself. The hyphen is not in
@@ -100,13 +100,13 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
     async def root() -> HTMLResponse:
         return HTMLResponse(NOT_FOUND_HTML, status_code=404)
 
-    @app.get("/d/{token}")
+    @app.get("/e/{token}")
     async def redirect_to_slash(token: str):
         # Bundles use relative asset paths, which only resolve correctly when
         # the page itself is served from a directory-style URL.
-        return RedirectResponse(f"/d/{token}/", status_code=308)
+        return RedirectResponse(f"/e/{token}/", status_code=308)
 
-    @app.get("/d/{token}/{asset_path:path}")
+    @app.get("/e/{token}/{asset_path:path}")
     async def serve_bundle(
         request: Request, token: str, asset_path: str, background: BackgroundTasks
     ):
@@ -149,7 +149,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
             cache = f"private, max-age={ASSET_CACHE_SECONDS}"
         return FileResponse(path, headers={"Cache-Control": cache})
 
-    @app.get("/api/d/{token}/context")
+    @app.get("/api/e/{token}/context")
     async def page_context(request: Request, token: str, background: BackgroundTasks):
         token, is_self = _split_owner_marker(token)
         page = await _lookup(request, token)
@@ -186,7 +186,7 @@ def create_app(settings: Settings, db: Database | None = None) -> FastAPI:
             headers={"Cache-Control": "no-store"},
         )
 
-    @app.post("/api/d/{token}/submit")
+    @app.post("/api/e/{token}/submit")
     async def submit(request: Request, token: str, background: BackgroundTasks):
         # Submissions are never suppressed, but the page posts from whatever URL
         # it was opened at, so the marker still has to come off first.

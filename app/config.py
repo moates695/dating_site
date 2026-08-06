@@ -34,7 +34,7 @@ class Settings:
         return bool(self.telegram_bot_token and self.telegram_chat_id)
 
     def page_url(self, token: str) -> str:
-        return f"{self.site_base_url.rstrip('/')}/d/{token}"
+        return f"{self.site_base_url.rstrip('/')}/e/{token}"
 
 
 def load_settings() -> Settings:

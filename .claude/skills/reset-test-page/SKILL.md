@@ -1,6 +1,6 @@
 ---
 name: reset-test-page
-description: Wipe stored replies and recorded views from the local dev database so a date page opens as a first-time visitor again. Use when asked to reset or wipe a test user, clear responses or views, see the form instead of the "Lovely" confirmation screen, or make the first-open notification fire again.
+description: Wipe stored replies and recorded views from the local dev database so an event page opens as a first-time visitor again. Use when asked to reset or wipe a test user, clear responses or views, see the form instead of the "Locked in" confirmation screen, or make the first-open notification fire again.
 ---
 
 # Reset a local test page
@@ -20,11 +20,11 @@ uv run scripts/reset_responses.py --dry-run       # count only, deletes nothing
 
 The token is the directory name under `pages/` and the last path segment of the
 page URL, for example `pages/eh9ankpbvuhs/` serves
-`http://127.0.0.1:8000/d/eh9ankpbvuhs/`.
+`http://127.0.0.1:8000/e/eh9ankpbvuhs/`.
 
 After it runs, hard-refresh the page. The reset changes database rows, not
 files, so a stale tab keeps showing the confirmation screen until it refetches
-`/api/d/<token>/context`.
+`/api/e/<token>/context`.
 
 ## What it does and does not touch
 

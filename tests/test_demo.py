@@ -15,14 +15,14 @@ SUBMISSION = {"summary": "Coffee", "answers": {"main": "coffee"}}
 
 
 def _submit(client, token: str = TEST_TOKEN):
-    return client.post(f"/api/d/{token}/submit", json=SUBMISSION)
+    return client.post(f"/api/e/{token}/submit", json=SUBMISSION)
 
 
 def test_a_visitor_never_sees_the_previous_one_s_answer(demo_client, demo_db):
     """The failure this exists to prevent: visitor two landing on the done screen."""
     _submit(demo_client)
 
-    context = demo_client.get(f"/api/d/{TEST_TOKEN}/context").json()
+    context = demo_client.get(f"/api/e/{TEST_TOKEN}/context").json()
 
     assert len(demo_db.responses) == 1
     assert context["submitted"] is False
@@ -30,21 +30,21 @@ def test_a_visitor_never_sees_the_previous_one_s_answer(demo_client, demo_db):
 
 
 def test_a_normal_page_still_shows_the_answer_back(client):
-    """The demo is the exception; an invitation must keep its confirmation."""
+    """The demo is the exception; a personal page must keep its confirmation."""
     _submit(client)
-    assert client.get(f"/api/d/{TEST_TOKEN}/context").json()["submitted"] is True
+    assert client.get(f"/api/e/{TEST_TOKEN}/context").json()["submitted"] is True
 
 
 def test_opening_the_demo_never_notifies(demo_client, caplog):
     with caplog.at_level(logging.INFO, logger="app.main"):
-        demo_client.get(f"/api/d/{TEST_TOKEN}/context")
+        demo_client.get(f"/api/e/{TEST_TOKEN}/context")
 
     assert "opened the page" not in caplog.text
 
 
 def test_demo_opens_are_still_recorded(demo_client, demo_db):
     """Silent, not invisible: the traffic stays visible after the fact."""
-    demo_client.get(f"/api/d/{TEST_TOKEN}/context")
+    demo_client.get(f"/api/e/{TEST_TOKEN}/context")
     assert [v["kind"] for v in demo_db.views] == ["load"]
 
 
@@ -67,7 +67,7 @@ def test_one_visitor_cannot_use_up_everyone_s_allowance(demo_client):
 
     # A different address is a different bucket, so it is unaffected.
     other = demo_client.post(
-        f"/api/d/{TEST_TOKEN}/submit",
+        f"/api/e/{TEST_TOKEN}/submit",
         json=SUBMISSION,
         headers={"cf-connecting-ip": "203.0.113.77"},
     )
