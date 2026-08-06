@@ -44,7 +44,7 @@ def main() -> None:
 
         pending = [path for path in migrations if path.stem not in applied]
         if not pending:
-            print(f"up to date ({len(applied)} applied)")
+            print(f"nothing pending ({len(applied)} applied)")
             return
 
         for path in pending:
